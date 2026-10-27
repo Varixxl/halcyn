@@ -319,6 +319,41 @@ class NowPlayingCard extends StatelessWidget {
       );
 }
 
+/// Room under the pages for the [NowPlayingCard] while it shows, through the bottom
+/// padding [dockInset] reads, so their last rows can scroll clear of it.
+class NowPlayingCardInset extends StatelessWidget {
+  const NowPlayingCardInset({super.key, required this.child});
+
+  final Widget child;
+
+  // The card (cover, title, artist, signal) and its 12 px margin.
+  static const height = 292.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = AppScope.of(context);
+    final shown = scope.themes.nowPlayingCard;
+    return ListenableBuilder(
+      listenable: Listenable.merge([scope.player, shown]),
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final extra = scope.player.current != null && shown.value
+            ? height
+            : 0.0;
+        return MediaQuery(
+          data: media.copyWith(
+            padding: media.padding.copyWith(
+              bottom: media.padding.bottom + extra,
+            ),
+          ),
+          child: child!,
+        );
+      },
+      child: child,
+    );
+  }
+}
+
 /// Shows or hides the [NowPlayingCard].
 class NowPlayingCardButton extends StatelessWidget {
   const NowPlayingCardButton({super.key});

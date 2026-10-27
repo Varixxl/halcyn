@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'dart:ui' show ImageByteFormat;
 
 import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halcyn/main.dart' as app;
 import 'package:halcyn/src/cast/protocol.dart';
@@ -216,6 +217,16 @@ void main() {
     await _shot(tester, 'cast-3-panel');
     await tester.tapAt(const Offset(8, 8));
     await _wait(tester, 400);
+
+    // Settings shows who's casting here, and the updates section.
+    await tester.tap(find.byTooltip('Settings').first);
+    await _wait(tester, 600);
+    await tester.drag(find.byType(Scrollable).last, const Offset(0, -3000));
+    await _wait(tester, 600);
+    expect(find.text('Let other devices play here'), findsOneWidget);
+    expect(find.text('Playing from Test phone'), findsOneWidget);
+    expect(find.text('Check for updates automatically'), findsOneWidget);
+    await _shot(tester, 'cast-4-settings');
 
     // Stopping: the phone gets its own queue back and the desktop plays on.
     await tester.runAsync(cast.disconnect);

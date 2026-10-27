@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'cast.dart';
 import 'theme_picker.dart';
+import 'updates.dart';
 import 'widgets.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -121,6 +122,7 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const CastSettings(),
+            const UpdateSettings(),
           ],
         );
       },

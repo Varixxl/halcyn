@@ -1,8 +1,10 @@
 package io.github.varixxl.halcyn
 
 import android.Manifest
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -11,6 +13,7 @@ import android.provider.Settings
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 /** audio_service's activity (it shares the engine with the media service), plus the
  *  `halcyn/android` channel for reading the music folder and showing notifications. */
@@ -31,6 +34,25 @@ class MainActivity : AudioServiceActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "canReadMusic" -> result.success(canReadMusic())
+                    "abi" -> result.success(Build.SUPPORTED_ABIS.first())
+                    "canInstall" -> result.success(packageManager.canRequestPackageInstalls())
+                    "allowInstalls" -> {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:$packageName"),
+                            )
+                        )
+                        result.success(null)
+                    }
+                    "installApk" -> {
+                        try {
+                            installApk(File(call.argument<String>("path")!!))
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error("install", e.message, null)
+                        }
+                    }
                     "deviceName" -> result.success(
                         Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
                             ?: Build.MODEL
@@ -51,6 +73,33 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    /** Hands the APK to the system installer, which asks the user and then restarts
+     *  Halcyn on the new version. [UpdateReceiver] shows the confirmation. */
+    private fun installApk(apk: File) {
+        val installer = packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        params.setAppPackageName(packageName)
+        if (Build.VERSION.SDK_INT >= 31) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+        }
+        val id = installer.createSession(params)
+        installer.openSession(id).use { session ->
+            apk.inputStream().use { input ->
+                session.openWrite("halcyn.apk", 0, apk.length()).use { output ->
+                    input.copyTo(output)
+                    session.fsync(output)
+                }
+            }
+            val status = PendingIntent.getBroadcast(
+                this,
+                id,
+                Intent(this, UpdateReceiver::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            )
+            session.commit(status.intentSender)
+        }
     }
 
     private fun canReadMusic(): Boolean =

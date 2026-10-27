@@ -359,22 +359,28 @@ class PlayerController extends ChangeNotifier {
   void _save() {
     if (session == null || _remote != null) return;
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(seconds: 1), () async {
-      _savedAt = position.value;
-      try {
-        await session!.writeAsString(
-          jsonEncode({
-            'queue': [for (final t in queue) t.path],
-            'index': index,
-            'position': position.value,
-            'shuffle': shuffle,
-            'repeat': repeat.name,
-          }),
-        );
-      } on Object catch (e) {
-        debugPrint('saving the session: $e');
-      }
-    });
+    _saveTimer = Timer(const Duration(seconds: 1), saveNow);
+  }
+
+  /// Writes the session right away, e.g. before quitting.
+  Future<void> saveNow() async {
+    _saveTimer?.cancel();
+    final session = this.session;
+    if (session == null || _remote != null) return;
+    _savedAt = position.value;
+    try {
+      await session.writeAsString(
+        jsonEncode({
+          'queue': [for (final t in queue) t.path],
+          'index': index,
+          'position': position.value,
+          'shuffle': shuffle,
+          'repeat': repeat.name,
+        }),
+      );
+    } on Object catch (e) {
+      debugPrint('saving the session: $e');
+    }
   }
 
   void _onPosition(double secs) {

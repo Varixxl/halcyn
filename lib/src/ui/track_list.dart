@@ -833,7 +833,10 @@ class CollectionPage extends StatelessWidget {
                     )
                   : reorderable
                   ? ReorderableListView.builder(
-                      padding: const EdgeInsets.only(top: 4, bottom: 24),
+                      padding: EdgeInsets.only(
+                        top: 4,
+                        bottom: 24 + dockInset(context),
+                      ),
                       buildDefaultDragHandles: false,
                       itemExtent: TrackRow.height,
                       itemCount: rows.length,
@@ -842,7 +845,10 @@ class CollectionPage extends StatelessWidget {
                       itemBuilder: (context, n) => row(n),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.only(top: 4, bottom: 24),
+                      padding: EdgeInsets.only(
+                        top: 4,
+                        bottom: 24 + dockInset(context),
+                      ),
                       itemExtent: TrackRow.height,
                       itemCount: rows.length,
                       itemBuilder: (context, n) => row(n),

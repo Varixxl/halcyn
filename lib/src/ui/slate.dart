@@ -16,12 +16,15 @@ class Pill extends StatelessWidget {
     required this.onPressed,
     this.selected = false,
     this.icon,
+    this.tooltip,
   });
 
+  /// May be empty for an icon-only pill; give it a [tooltip] then.
   final String label;
   final VoidCallback? onPressed;
   final bool selected;
   final IconData? icon;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +32,7 @@ class Pill extends StatelessWidget {
     // accentDeep, not accent: white text needs the darker blue to stay readable.
     final fill = selected ? Palette.accentDeep : Colors.transparent;
     final color = selected ? Palette.onAccent : Palette.text;
-    return AnimatedContainer(
+    final pill = AnimatedContainer(
       duration: SlateMotion.select,
       curve: Motion.curve,
       decoration: BoxDecoration(
@@ -45,22 +48,24 @@ class Pill extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 34),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: EdgeInsets.symmetric(
+                horizontal: label.isEmpty ? 10 : 14,
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 16, color: color),
+                  if (icon != null) Icon(icon, size: 16, color: color),
+                  if (icon != null && label.isNotEmpty)
                     const SizedBox(width: 6),
-                  ],
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: color,
+                  if (label.isNotEmpty)
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: color,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -68,6 +73,7 @@ class Pill extends StatelessWidget {
         ),
       ),
     );
+    return tooltip == null ? pill : Tooltip(message: tooltip, child: pill);
   }
 }
 

@@ -166,6 +166,12 @@ void main() {
     await _wait(tester, 1500);
     expect(state.current!.path, second.path);
     expect(find.text(second.title), findsWidgets);
+    // The big title follows the track (it used to stay on the first one).
+    Finder headline(String title) => find.byWidgetPredicate(
+      (w) => w is Text && w.data == title && w.maxLines == 2,
+    );
+    expect(headline(second.title), findsOneWidget);
+    expect(headline(first.title), findsNothing);
 
     // Escape closes it.
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);

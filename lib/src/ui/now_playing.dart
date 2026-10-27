@@ -4,8 +4,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../rust/api/library.dart';
 import '../signal_path_view.dart';
 import '../state/lyrics.dart';
+import '../state/player.dart';
 import '../theme.dart';
 import '../window.dart';
 import 'cast.dart';
@@ -93,6 +95,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
             listenable: player,
             builder: (context, _) {
               final track = player.current;
+              final narrowBar = MediaQuery.sizeOf(context).width < 520;
               return VisualizerBackdrop(
                 art: track?.art,
                 child: SafeArea(
@@ -123,15 +126,22 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                             const CastButton(compact: true),
                             if (!player.casting) const EqButton(),
                             const SizedBox(width: 8),
+                            // A phone is too narrow for the volume, cast, Lyrics
+                            // and Queue side by side, so the pills keep just their
+                            // icons (and the queue's count).
                             Pill(
-                              label: 'Lyrics',
+                              label: narrowBar ? '' : 'Lyrics',
+                              tooltip: narrowBar ? 'Lyrics' : null,
                               icon: Icons.lyrics_outlined,
                               selected: panel == NowPlayingPanel.lyrics,
                               onPressed: () => _toggle(NowPlayingPanel.lyrics),
                             ),
                             const SizedBox(width: 8),
                             Pill(
-                              label: 'Queue · ${player.upNext.length}',
+                              label: narrowBar
+                                  ? '${player.upNext.length}'
+                                  : 'Queue · ${player.upNext.length}',
+                              tooltip: narrowBar ? 'Queue' : null,
                               icon: Icons.queue_music_rounded,
                               selected: panel == NowPlayingPanel.queue,
                               onPressed: () => _toggle(NowPlayingPanel.queue),
@@ -501,10 +511,20 @@ class _Cover extends StatelessWidget {
 class _Titles extends StatelessWidget {
   const _Titles();
 
+  // It's const, so it listens itself: its parent doesn't rebuild it on a new track.
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final player = AppScope.of(context).player;
+    return ListenableBuilder(
+      listenable: player,
+      builder: (context, _) => player.current == null
+          ? const SizedBox.shrink()
+          : _titles(context, player),
+    );
+  }
+
+  Widget _titles(BuildContext context, PlayerController player) {
+    final theme = Theme.of(context);
     final track = player.current!;
     final album = [?track.album, ?track.year?.toString()].join(' · ');
     return AnimatedSwitcher(
@@ -516,7 +536,7 @@ class _Titles extends StatelessWidget {
         children: [...previous, ?current],
       ),
       child: Column(
-        key: ValueKey(track.id),
+        key: ValueKey(track.path),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -568,8 +588,17 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final player = AppScope.of(context).player;
+    return ListenableBuilder(
+      listenable: player,
+      builder: (context, _) => player.current == null
+          ? const SizedBox.shrink()
+          : _header(context, player.current!),
+    );
+  }
+
+  Widget _header(BuildContext context, Track track) {
     final theme = Theme.of(context);
-    final track = AppScope.of(context).player.current!;
     return Row(
       children: [
         Artwork(art: track.art, size: 56, radius: 10),

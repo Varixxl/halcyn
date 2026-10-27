@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'src/rust/api/library.dart';
@@ -8,15 +9,18 @@ import 'src/rust/frb_generated.dart';
 import 'src/cast/receiver.dart';
 import 'src/cast/sender.dart';
 import 'src/state/android.dart';
+import 'src/state/error_log.dart';
 import 'src/state/library.dart';
 import 'src/state/player.dart';
 import 'src/state/playlists.dart';
 import 'src/state/sort.dart';
 import 'src/state/sound.dart';
 import 'src/state/themes.dart';
+import 'src/state/updater.dart';
 import 'src/theme.dart';
 import 'src/ui/cast.dart';
 import 'src/ui/shell.dart';
+import 'src/ui/updates.dart';
 import 'src/ui/widgets.dart';
 import 'src/ui/window_frame.dart';
 import 'src/window.dart';
@@ -26,6 +30,7 @@ Future<void> main(List<String> args) async {
   await RustLib.init();
 
   final data = await getApplicationSupportDirectory();
+  logErrorsTo(File('${data.path}/halcyn.log'));
   final cache = await getApplicationCacheDirectory();
   await libraryOpen(dataDir: data.path, cacheDir: cache.path);
 
@@ -63,7 +68,12 @@ Future<void> main(List<String> args) async {
     player: player,
     library: library,
     sound: sound,
-    settings: File('${data.path}/cast-receiver.json'),
+    // A test gets no approvals: it never sees the devices the user allowed.
+    settings: File(
+      listening
+          ? '${data.path}/cast-receiver.json'
+          : '${cache.path}/cast-receiver-test.json',
+    ),
     cacheDir: cache,
     artDir: artDir,
     persist: listening,
@@ -81,6 +91,14 @@ Future<void> main(List<String> args) async {
   if (listening || Platform.environment.containsKey('HALCYN_CAST_PORT')) {
     await receiver.load();
   }
+  final updater = Updater(
+    settings: File('${data.path}/update.json'),
+    cacheDir: cache,
+    current: (await PackageInfo.fromPlatform()).version,
+    persist: listening,
+  );
+  await updater.load();
+  if (listening) updater.checkLater();
   await Future.wait([
     access.start(),
     MediaSession.start(player, library, artDir),
@@ -102,6 +120,7 @@ Future<void> main(List<String> args) async {
       artDir: artDir,
       cast: cast,
       receiver: receiver,
+      updater: updater,
       child: const HalcynApp(),
     ),
   );
@@ -165,8 +184,9 @@ class _HalcynAppState extends State<HalcynApp> {
       // Palette switches at once, so ThemeData must too.
       themeAnimationDuration: Duration.zero,
       navigatorKey: appNavigator,
-      builder: (context, child) =>
-          PairingPrompts(child: WindowFrame(child: child!)),
+      builder: (context, child) => UpdatePrompt(
+        child: PairingPrompts(child: WindowFrame(child: child!)),
+      ),
       home: const Shell(),
     );
   }

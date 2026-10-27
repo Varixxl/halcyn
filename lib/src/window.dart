@@ -24,7 +24,7 @@ class WindowController extends ChangeNotifier {
 
   bool _busy = false;
   // Where the window was before the mini player took over, to put it back.
-  ({bool floating, List<num> at, List<num> size})? _hyprBefore;
+  ({bool floating, List<num> at, List<num> size, int workspace})? _hyprBefore;
   Size? _gtkBefore;
   // Where the user left the mini player, so it comes back there.
   List<num>? _miniAt;
@@ -74,6 +74,7 @@ class WindowController extends ChangeNotifier {
         floating: client['floating'] as bool,
         at: (client['at'] as List).cast<num>(),
         size: (client['size'] as List).cast<num>(),
+        workspace: (client['workspace'] as Map)['id'] as int,
       );
       final (at, size) = await _miniPlacement(client);
       // Old (non-Lua) Hyprland configs answer anything but "ok"; fall back to GTK.
@@ -103,6 +104,16 @@ class WindowController extends ChangeNotifier {
     if (client['pinned'] == true) {
       await _dispatch("hl.dsp.window.pin({ action = 'unset', $window })");
     }
+    // A pinned window follows the user onto a scratchpad (a special workspace), and
+    // unpinning leaves it there. Bring it back to a regular workspace and focus it,
+    // which also puts the scratchpad away: one left open with nothing on it covers
+    // the monitor and takes every click and key meant for the window under it.
+    final returnTo = await _hyprRegularWorkspace(before.workspace);
+    if (returnTo != null) {
+      await _dispatch(
+        "hl.dsp.window.move({ workspace = '$returnTo', follow = false, $window })",
+      );
+    }
     if (before.floating) {
       await _dispatch(
         'hl.dsp.window.resize({ x = ${before.size[0]}, y = ${before.size[1]}, $window })',
@@ -113,7 +124,25 @@ class WindowController extends ChangeNotifier {
     } else {
       await _dispatch("hl.dsp.window.float({ action = 'unset', $window })");
     }
+    if (returnTo != null) await _dispatch('hl.dsp.focus({ $window })');
     return true;
+  }
+
+  /// Where to put the window if it's on a special workspace now: the regular one it
+  /// came from, else the one showing under the scratchpad on its monitor. Null when
+  /// it's already on a regular workspace.
+  Future<int?> _hyprRegularWorkspace(int before) async {
+    final client = await _hyprClient();
+    final now = (client?['workspace'] as Map?)?['id'] as int?;
+    if (client == null || now == null || now > 0) return null;
+    if (before > 0) return before;
+    final monitors = await _hyprJson('monitors') ?? const [];
+    final monitor = monitors
+        .cast<Map<String, dynamic>>()
+        .where((m) => m['id'] == client['monitor'])
+        .firstOrNull;
+    final active = (monitor?['activeWorkspace'] as Map?)?['id'] as int?;
+    return active != null && active > 0 ? active : null;
   }
 
   /// The last spot the user left the mini player, or the right edge of the window's

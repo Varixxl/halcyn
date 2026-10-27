@@ -219,7 +219,9 @@ class _ShellState extends State<Shell> {
                                     onSelect: _select,
                                     search: _searchField(global: true),
                                   ),
-                                  Expanded(child: content),
+                                  Expanded(
+                                    child: NowPlayingCardInset(child: content),
+                                  ),
                                 ],
                               ),
                               const Positioned(
