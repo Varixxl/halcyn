@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../rust/api/library.dart';
-import '../rust/api/player.dart';
+import '../state/spectrum.dart';
 import '../theme.dart';
 import 'widgets.dart';
 
@@ -61,23 +61,6 @@ class CoverPalette {
   }
 }
 
-/// The engine's band levels, shared: it runs one analyser, so every visualizer on screen
-/// (Now Playing behind the mini player, say) listens to the same feed, which stops when
-/// the last one goes.
-final Stream<Float32List> _spectrumFeed = () {
-  StreamSubscription<Float32List>? source;
-  late final StreamController<Float32List> feed;
-  feed = StreamController.broadcast(
-    onListen: () => source = playerSpectrum().listen(feed.add),
-    onCancel: () {
-      source?.cancel();
-      source = null;
-      playerSpectrumStop();
-    },
-  );
-  return feed.stream;
-}();
-
 /// A live spectrum behind `child`: bars rising from the bottom edge and a glow that
 /// breathes with the bass, painted in the cover's colours. Only runs while shown, and
 /// stops drawing when the music stops.
@@ -112,7 +95,7 @@ class _VisualizerBackdropState extends State<VisualizerBackdrop>
   @override
   void initState() {
     super.initState();
-    _spectrum = _spectrumFeed.listen(_onSpectrum);
+    _spectrum = spectrum.listen(_onSpectrum);
   }
 
   @override

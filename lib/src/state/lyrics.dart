@@ -34,11 +34,16 @@ class Lyrics {
   }
 }
 
-/// The `.lrc` beside the track, or null if there isn't one.
-Future<Lyrics?> loadLyrics(String trackPath) async {
+/// The `.lrc` beside the track, or null if there isn't one. `fetch` gets it from
+/// elsewhere when it isn't here.
+Future<Lyrics?> loadLyrics(
+  String trackPath, {
+  Future<String?> Function(String trackPath)? fetch,
+}) async {
   try {
     return parseLrc(await File(lyricsPath(trackPath)).readAsString());
   } on Object {
+    if (await fetch?.call(trackPath) case final text?) return parseLrc(text);
     return null;
   }
 }

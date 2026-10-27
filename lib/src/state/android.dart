@@ -11,6 +11,20 @@ import 'player.dart';
 
 const _channel = MethodChannel('halcyn/android');
 
+/// What to call this device when casting: the name set in Android's settings, or the
+/// computer's host name.
+Future<String> deviceName() async {
+  if (Platform.isAndroid) {
+    try {
+      final name = await _channel.invokeMethod<String>('deviceName');
+      if (name != null && name.isNotEmpty) return name;
+    } on Object {
+      // Older build of the Android side.
+    }
+  }
+  return Platform.localHostname;
+}
+
 /// Android: whether Halcyn may read the music folder. Asking opens Android's "All files
 /// access" page; coming back to the app checks again and scans once it's allowed.
 class MusicAccess extends ChangeNotifier with WidgetsBindingObserver {
@@ -76,8 +90,13 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
     var resume = false;
-    session.becomingNoisyEventStream.listen((_) => player.pause());
+    // While casting, the music isn't coming out of this phone, so unplugging its
+    // headphones or taking a call leaves it alone.
+    session.becomingNoisyEventStream.listen((_) {
+      if (!player.casting) player.pause();
+    });
     session.interruptionEventStream.listen((event) {
+      if (player.casting) return;
       if (event.begin) {
         resume = player.playing && event.type != AudioInterruptionType.unknown;
         player.pause();

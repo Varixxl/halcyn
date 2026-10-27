@@ -81,8 +81,12 @@ sealed class PlayerEvent with _$PlayerEvent {
   const factory PlayerEvent.position({required double secs}) =
       PlayerEvent_Position;
   const factory PlayerEvent.ended() = PlayerEvent_Ended;
-  const factory PlayerEvent.error({required String message}) =
-      PlayerEvent_Error;
+
+  /// `index` is the queue entry it happened on, e.g. a file that couldn't be opened.
+  const factory PlayerEvent.error({
+    required String message,
+    required int index,
+  }) = PlayerEvent_Error;
 }
 
 /// What happens when a track ends.

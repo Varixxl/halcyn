@@ -61,10 +61,14 @@ class VolumeSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sound = AppScope.of(context).sound;
+    final cast = AppScope.of(context).cast;
     return ListenableBuilder(
-      listenable: sound,
+      listenable: Listenable.merge([sound, cast]),
       builder: (context, _) {
-        final v = sound.volume;
+        // While casting, the volume of the device cast to.
+        final remote = cast.connected;
+        final v = remote ? cast.volume : sound.volume;
+        final muted = v == 0;
         final icon = v == 0
             ? Icons.volume_off_rounded
             : v < 0.5
@@ -74,11 +78,11 @@ class VolumeSlider extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              onPressed: sound.toggleMute,
+              onPressed: remote ? cast.toggleMute : sound.toggleMute,
               icon: Icon(icon),
               iconSize: 20,
               color: Palette.textMuted,
-              tooltip: sound.muted ? 'Unmute' : 'Mute',
+              tooltip: muted ? 'Unmute' : 'Mute',
             ),
             SizedBox(
               width: width,
@@ -87,7 +91,7 @@ class VolumeSlider extends StatelessWidget {
                     .copyWith(padding: EdgeInsets.zero, trackHeight: 3),
                 child: Slider(
                   value: v,
-                  onChanged: sound.setVolume,
+                  onChanged: remote ? cast.setVolume : sound.setVolume,
                   label: '${(v * 100).round()}%',
                   semanticFormatterCallback: (v) =>
                       'Volume ${(v * 100).round()}%',

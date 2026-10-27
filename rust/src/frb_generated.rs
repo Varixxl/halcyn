@@ -1342,8 +1342,10 @@ impl SseDecode for crate::api::player::PlayerEvent {
             }
             5 => {
                 let mut var_message = <String>::sse_decode(deserializer);
+                let mut var_index = <u32>::sse_decode(deserializer);
                 return crate::api::player::PlayerEvent::Error {
                     message: var_message,
+                    index: var_index,
                 };
             }
             _ => {
@@ -1658,9 +1660,12 @@ impl flutter_rust_bridge::IntoDart for crate::api::player::PlayerEvent {
                 [3.into_dart(), secs.into_into_dart().into_dart()].into_dart()
             }
             crate::api::player::PlayerEvent::Ended => [4.into_dart()].into_dart(),
-            crate::api::player::PlayerEvent::Error { message } => {
-                [5.into_dart(), message.into_into_dart().into_dart()].into_dart()
-            }
+            crate::api::player::PlayerEvent::Error { message, index } => [
+                5.into_dart(),
+                message.into_into_dart().into_dart(),
+                index.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
             _ => {
                 unimplemented!("");
             }
@@ -2098,9 +2103,10 @@ impl SseEncode for crate::api::player::PlayerEvent {
             crate::api::player::PlayerEvent::Ended => {
                 <i32>::sse_encode(4, serializer);
             }
-            crate::api::player::PlayerEvent::Error { message } => {
+            crate::api::player::PlayerEvent::Error { message, index } => {
                 <i32>::sse_encode(5, serializer);
                 <String>::sse_encode(message, serializer);
+                <u32>::sse_encode(index, serializer);
             }
             _ => {
                 unimplemented!("");

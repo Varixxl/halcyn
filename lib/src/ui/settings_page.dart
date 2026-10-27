@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'cast.dart';
 import 'theme_picker.dart';
 import 'widgets.dart';
 
@@ -119,6 +120,7 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
             ),
+            const CastSettings(),
           ],
         );
       },

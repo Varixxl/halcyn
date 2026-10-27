@@ -5,6 +5,8 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/rust/api/library.dart';
 import 'src/rust/frb_generated.dart';
+import 'src/cast/receiver.dart';
+import 'src/cast/sender.dart';
 import 'src/state/android.dart';
 import 'src/state/library.dart';
 import 'src/state/player.dart';
@@ -13,6 +15,7 @@ import 'src/state/sort.dart';
 import 'src/state/sound.dart';
 import 'src/state/themes.dart';
 import 'src/theme.dart';
+import 'src/ui/cast.dart';
 import 'src/ui/shell.dart';
 import 'src/ui/widgets.dart';
 import 'src/ui/window_frame.dart';
@@ -55,6 +58,29 @@ Future<void> main(List<String> args) async {
   if (args.isEmpty) await player.restore(library.byPath);
   final access = MusicAccess(library);
   final artDir = libraryArtDir();
+  // A test listens on its own ports (HALCYN_CAST_PORT), never beside the real one.
+  final receiver = CastReceiver(
+    player: player,
+    library: library,
+    sound: sound,
+    settings: File('${data.path}/cast-receiver.json'),
+    cacheDir: cache,
+    artDir: artDir,
+    persist: listening,
+  );
+  final cast = CastController(
+    player: player,
+    artDir: artDir,
+    settings: File('${data.path}/cast.json'),
+    receiverId: () => receiver.id,
+    persist: listening,
+  );
+  final name = await deviceName();
+  receiver.name = name;
+  await cast.load(deviceName: name);
+  if (listening || Platform.environment.containsKey('HALCYN_CAST_PORT')) {
+    await receiver.load();
+  }
   await Future.wait([
     access.start(),
     MediaSession.start(player, library, artDir),
@@ -74,6 +100,8 @@ Future<void> main(List<String> args) async {
       sort: sort,
       access: access,
       artDir: artDir,
+      cast: cast,
+      receiver: receiver,
       child: const HalcynApp(),
     ),
   );
@@ -137,7 +165,8 @@ class _HalcynAppState extends State<HalcynApp> {
       // Palette switches at once, so ThemeData must too.
       themeAnimationDuration: Duration.zero,
       navigatorKey: appNavigator,
-      builder: (context, child) => WindowFrame(child: child!),
+      builder: (context, child) =>
+          PairingPrompts(child: WindowFrame(child: child!)),
       home: const Shell(),
     );
   }

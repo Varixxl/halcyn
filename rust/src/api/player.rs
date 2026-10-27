@@ -51,7 +51,8 @@ pub enum PlayerEvent {
     Playing { playing: bool },
     Position { secs: f64 },
     Ended,
-    Error { message: String },
+    /// `index` is the queue entry it happened on, e.g. a file that couldn't be opened.
+    Error { message: String, index: u32 },
 }
 
 /// Where events go. Until Flutter subscribes they wait in `pending`, so a file opened right

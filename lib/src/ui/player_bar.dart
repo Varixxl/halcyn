@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'cast.dart';
 import 'equalizer.dart';
 import 'now_playing.dart';
 import 'sidebar.dart';
@@ -78,7 +79,8 @@ class PlayerBar extends StatelessWidget {
                   color: Palette.textMuted,
                   tooltip: 'Queue',
                 ),
-              const EqButton(),
+              const CastButton(),
+              if (!player.casting) const EqButton(),
               const NowPlayingCardButton(),
               const VolumeSlider(width: 96),
             ],
@@ -127,6 +129,8 @@ class MiniPlayer extends StatelessWidget {
                                   artists: track.artists,
                                 ),
                               ),
+                              if (player.casting)
+                                const CastButton(compact: true),
                               const PlayPauseButton(size: 44, filled: false),
                             ],
                           ),

@@ -1231,7 +1231,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 4:
         return PlayerEvent_Ended();
       case 5:
-        return PlayerEvent_Error(message: dco_decode_String(raw[1]));
+        return PlayerEvent_Error(
+          message: dco_decode_String(raw[1]),
+          index: dco_decode_u_32(raw[2]),
+        );
       default:
         throw Exception("unreachable");
     }
@@ -1635,7 +1638,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         return PlayerEvent_Ended();
       case 5:
         var var_message = sse_decode_String(deserializer);
-        return PlayerEvent_Error(message: var_message);
+        var var_index = sse_decode_u_32(deserializer);
+        return PlayerEvent_Error(message: var_message, index: var_index);
       default:
         throw UnimplementedError('');
     }
@@ -2076,9 +2080,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_f_64(secs, serializer);
       case PlayerEvent_Ended():
         sse_encode_i_32(4, serializer);
-      case PlayerEvent_Error(message: final message):
+      case PlayerEvent_Error(message: final message, index: final index):
         sse_encode_i_32(5, serializer);
         sse_encode_String(message, serializer);
+        sse_encode_u_32(index, serializer);
     }
   }
 

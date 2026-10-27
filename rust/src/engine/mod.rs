@@ -474,7 +474,7 @@ impl Runner {
     fn fail(&mut self, err: anyhow::Error) {
         self.end_session();
         self.set_playing(false);
-        (self.emit)(PlayerEvent::Error { message: format!("{err:#}") });
+        (self.emit)(PlayerEvent::Error { message: format!("{err:#}"), index: self.index as u32 });
     }
 }
 

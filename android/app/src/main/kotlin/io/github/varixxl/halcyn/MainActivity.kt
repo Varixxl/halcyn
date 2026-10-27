@@ -31,6 +31,10 @@ class MainActivity : AudioServiceActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "canReadMusic" -> result.success(canReadMusic())
+                    "deviceName" -> result.success(
+                        Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
+                            ?: Build.MODEL
+                    )
                     "askToReadMusic" -> {
                         askToReadMusic()
                         result.success(null)

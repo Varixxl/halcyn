@@ -8,6 +8,7 @@ import '../signal_path_view.dart';
 import '../state/lyrics.dart';
 import '../theme.dart';
 import '../window.dart';
+import 'cast.dart';
 import 'equalizer.dart';
 import 'player_bar.dart';
 import 'queue_page.dart';
@@ -110,10 +111,17 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                               tooltip: 'Close (Esc)',
                             ),
                             const Spacer(),
-                            // Phones have their own volume keys.
-                            if (MediaQuery.sizeOf(context).width >= 600)
-                              const VolumeSlider(),
-                            const EqButton(),
+                            // Phones have their own volume keys, but those don't
+                            // reach the device cast to.
+                            if (MediaQuery.sizeOf(context).width >= 600 ||
+                                player.casting)
+                              VolumeSlider(
+                                width: MediaQuery.sizeOf(context).width < 600
+                                    ? 72
+                                    : 120,
+                              ),
+                            const CastButton(compact: true),
+                            if (!player.casting) const EqButton(),
                             const SizedBox(width: 8),
                             Pill(
                               label: 'Lyrics',
@@ -653,7 +661,13 @@ class LyricsView extends StatefulWidget {
 }
 
 class _LyricsViewState extends State<LyricsView> {
-  late final Future<Lyrics?> _lyrics = loadLyrics(widget.path);
+  // While casting, the .lrc is on the other device.
+  late final Future<Lyrics?> _lyrics = loadLyrics(
+    widget.path,
+    fetch: AppScope.of(context).cast.connected
+        ? AppScope.of(context).cast.lyrics
+        : null,
+  );
   final _scroll = ScrollController();
   List<GlobalKey> _keys = const [];
   Lyrics? _loaded;

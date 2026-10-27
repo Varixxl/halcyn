@@ -132,7 +132,7 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( TrackInfo track,  int index)?  loaded,TResult Function( SignalPath path)?  path,TResult Function( bool playing)?  playing,TResult Function( double secs)?  position,TResult Function()?  ended,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( TrackInfo track,  int index)?  loaded,TResult Function( SignalPath path)?  path,TResult Function( bool playing)?  playing,TResult Function( double secs)?  position,TResult Function()?  ended,TResult Function( String message,  int index)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case PlayerEvent_Loaded() when loaded != null:
 return loaded(_that.track,_that.index);case PlayerEvent_Path() when path != null:
@@ -140,7 +140,7 @@ return path(_that.path);case PlayerEvent_Playing() when playing != null:
 return playing(_that.playing);case PlayerEvent_Position() when position != null:
 return position(_that.secs);case PlayerEvent_Ended() when ended != null:
 return ended();case PlayerEvent_Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message,_that.index);case _:
   return orElse();
 
 }
@@ -158,7 +158,7 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( TrackInfo track,  int index)  loaded,required TResult Function( SignalPath path)  path,required TResult Function( bool playing)  playing,required TResult Function( double secs)  position,required TResult Function()  ended,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( TrackInfo track,  int index)  loaded,required TResult Function( SignalPath path)  path,required TResult Function( bool playing)  playing,required TResult Function( double secs)  position,required TResult Function()  ended,required TResult Function( String message,  int index)  error,}) {final _that = this;
 switch (_that) {
 case PlayerEvent_Loaded():
 return loaded(_that.track,_that.index);case PlayerEvent_Path():
@@ -166,7 +166,7 @@ return path(_that.path);case PlayerEvent_Playing():
 return playing(_that.playing);case PlayerEvent_Position():
 return position(_that.secs);case PlayerEvent_Ended():
 return ended();case PlayerEvent_Error():
-return error(_that.message);}
+return error(_that.message,_that.index);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -180,7 +180,7 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( TrackInfo track,  int index)?  loaded,TResult? Function( SignalPath path)?  path,TResult? Function( bool playing)?  playing,TResult? Function( double secs)?  position,TResult? Function()?  ended,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( TrackInfo track,  int index)?  loaded,TResult? Function( SignalPath path)?  path,TResult? Function( bool playing)?  playing,TResult? Function( double secs)?  position,TResult? Function()?  ended,TResult? Function( String message,  int index)?  error,}) {final _that = this;
 switch (_that) {
 case PlayerEvent_Loaded() when loaded != null:
 return loaded(_that.track,_that.index);case PlayerEvent_Path() when path != null:
@@ -188,7 +188,7 @@ return path(_that.path);case PlayerEvent_Playing() when playing != null:
 return playing(_that.playing);case PlayerEvent_Position() when position != null:
 return position(_that.secs);case PlayerEvent_Ended() when ended != null:
 return ended();case PlayerEvent_Error() when error != null:
-return error(_that.message);case _:
+return error(_that.message,_that.index);case _:
   return null;
 
 }
@@ -506,10 +506,11 @@ String toString() {
 
 
 class PlayerEvent_Error extends PlayerEvent {
-  const PlayerEvent_Error({required this.message}): super._();
+  const PlayerEvent_Error({required this.message, required this.index}): super._();
   
 
  final  String message;
+ final  int index;
 
 /// Create a copy of PlayerEvent
 /// with the given fields replaced by the non-null parameter values.
@@ -521,18 +522,18 @@ $PlayerEvent_ErrorCopyWith<PlayerEvent_Error> get copyWith => _$PlayerEvent_Erro
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is PlayerEvent_Error&&(identical(other.message, message) || other.message == message));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is PlayerEvent_Error&&(identical(other.message, message) || other.message == message)&&(identical(other.index, index) || other.index == index));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,message);
+    return Object.hash(runtimeType,message,index);
 }
 
 @override
 String toString() {
-    return 'PlayerEvent.error(message: $message)';
+    return 'PlayerEvent.error(message: $message, index: $index)';
 }
 
 
@@ -543,7 +544,7 @@ abstract mixin class $PlayerEvent_ErrorCopyWith<$Res> implements $PlayerEventCop
   factory $PlayerEvent_ErrorCopyWith(PlayerEvent_Error value, $Res Function(PlayerEvent_Error) _then) = _$PlayerEvent_ErrorCopyWithImpl;
 @useResult
 $Res call({
- String message
+ String message, int index
 });
 
 
@@ -560,10 +561,11 @@ class _$PlayerEvent_ErrorCopyWithImpl<$Res>
 
 /// Create a copy of PlayerEvent
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? message = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? message = null,Object? index = null,}) {
   return _then(PlayerEvent_Error(
 message: null == message ? _self.message : message // ignore: cast_nullable_to_non_nullable
-as String,
+as String,index: null == index ? _self.index : index // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

@@ -1,3 +1,6 @@
+import '../cast/receiver.dart';
+import '../cast/sender.dart';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,6 +30,8 @@ class AppScope extends InheritedWidget {
     required this.sort,
     required this.access,
     required this.artDir,
+    required this.cast,
+    required this.receiver,
     required super.child,
   });
 
@@ -39,6 +44,8 @@ class AppScope extends InheritedWidget {
   final SortPrefs sort;
   final MusicAccess access;
   final String artDir;
+  final CastController cast;
+  final CastReceiver receiver;
 
   static AppScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!;
