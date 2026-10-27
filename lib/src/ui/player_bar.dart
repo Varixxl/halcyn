@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'equalizer.dart';
 import 'now_playing.dart';
+import 'sidebar.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -78,6 +79,7 @@ class PlayerBar extends StatelessWidget {
                   tooltip: 'Queue',
                 ),
               const EqButton(),
+              const NowPlayingCardButton(),
               const VolumeSlider(width: 96),
             ],
           );

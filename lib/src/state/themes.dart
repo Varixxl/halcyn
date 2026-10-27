@@ -12,9 +12,18 @@ class ThemeController extends ChangeNotifier {
   /// Used until the user picks another.
   static const defaultId = 'adaptive-slate';
 
-  ThemeController(this._settings);
+  ThemeController(this._settings, {this.persist = true}) {
+    nowPlayingCard.addListener(_save);
+  }
 
   final File _settings;
+
+  /// False while testing, so the real choices are read but never overwritten.
+  final bool persist;
+
+  /// Whether the cover card floats at the bottom right of the desktop window. Apart from
+  /// the theme, so hiding it doesn't rebuild the whole app.
+  final nowPlayingCard = ValueNotifier(true);
   List<HalcynTheme> themes = const [HalcynTheme.lapisVelvetEvening];
 
   HalcynTheme get current => Palette.theme;
@@ -49,9 +58,9 @@ class ThemeController extends ChangeNotifier {
 
     String? saved;
     try {
-      saved =
-          (jsonDecode(await _settings.readAsString()) as Map)['theme']
-              as String?;
+      final settings = jsonDecode(await _settings.readAsString()) as Map;
+      saved = settings['theme'] as String?;
+      nowPlayingCard.value = settings['nowPlayingCard'] != false;
     } on Object {
       // No settings yet.
     }
@@ -65,10 +74,20 @@ class ThemeController extends ChangeNotifier {
     if (theme.id == current.id) return;
     Palette.theme = theme;
     notifyListeners();
+    await _save();
+  }
+
+  Future<void> _save() async {
+    if (!persist) return;
     try {
-      await _settings.writeAsString(jsonEncode({'theme': theme.id}));
+      await _settings.writeAsString(
+        jsonEncode({
+          'theme': current.id,
+          'nowPlayingCard': nowPlayingCard.value,
+        }),
+      );
     } on Object catch (e) {
-      debugPrint('saving theme: $e');
+      debugPrint('saving ui settings: $e');
     }
   }
 }

@@ -26,14 +26,16 @@ Future<void> main(List<String> args) async {
   final cache = await getApplicationCacheDirectory();
   await libraryOpen(dataDir: data.path, cacheDir: cache.path);
 
-  final themes = ThemeController(File('${data.path}/ui.json'));
-  await themes.load();
-  final library = LibraryController();
-  final playlists = PlaylistsController();
-
   // Audio sent to a test sink (see integration_test/) isn't listening: it doesn't
   // count towards Most played, replace the session to resume or save settings.
   final listening = !Platform.environment.containsKey('HALCYN_PW_TARGET');
+  final themes = ThemeController(
+    File('${data.path}/ui.json'),
+    persist: listening,
+  );
+  await themes.load();
+  final library = LibraryController();
+  final playlists = PlaylistsController();
   final sound = SoundController(
     File('${data.path}/sound.json'),
     persist: listening,

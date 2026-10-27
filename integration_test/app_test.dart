@@ -9,9 +9,11 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show ImageByteFormat;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halcyn/main.dart' as app;
@@ -70,6 +72,26 @@ void main() {
       findsOneWidget,
     );
 
+    // The cover card floats at the bottom right, above the volume; it hides from its
+    // corner and comes back from the player bar.
+    final card = tester.getRect(find.byType(NowPlayingCard));
+    final volume = tester.getRect(find.byType(VolumeSlider));
+    expect(card.right, greaterThan(volume.left));
+    expect(card.bottom, lessThan(volume.top));
+    await tester.tap(find.byTooltip('Hide'));
+    await _wait(tester, 600);
+    expect(
+      find.descendant(
+        of: find.byType(NowPlayingCard),
+        matching: find.text(first.title),
+      ),
+      findsNothing,
+    );
+    await _shot('1b-card-hidden');
+    await tester.tap(find.byTooltip('Show the cover card'));
+    await _wait(tester, 600);
+    expect(find.byTooltip('Hide the cover card'), findsOneWidget);
+
     // Now Playing from the card: the visualizer runs behind it, the controls sit under
     // the cover, and a wide window shows Up Next beside them.
     await tester.tap(find.byType(NowPlayingCard));
@@ -94,6 +116,50 @@ void main() {
     await _wait(tester, 1000);
     expect(find.text(second.title), findsWidgets);
     await _shot('4-queue');
+
+    // A phone on its side, with the queue open and closed: every control is on screen
+    // and can be pressed, without scrolling.
+    final queuePill = find.byWidgetPredicate(
+      (w) => w is Pill && w.label.startsWith('Queue'),
+    );
+    for (final open in [true, false]) {
+      for (final size in const [Size(915, 412), Size(740, 340)]) {
+        tester.view.physicalSize = size * tester.view.devicePixelRatio;
+        await _wait(tester, 900);
+        final controls = {
+          'close': find.byTooltip('Close (Esc)'),
+          'equalizer': find.byTooltip(RegExp('^Equalizer')),
+          'lyrics': find.widgetWithText(Pill, 'Lyrics'),
+          'queue': queuePill,
+          'shuffle': find.byTooltip(RegExp('^Shuffle')),
+          'previous': find.byTooltip('Previous'),
+          'play': find.byTooltip('Play/Pause (Space)'),
+          'next': find.byTooltip('Next'),
+          'repeat': find.byTooltip(RegExp('^Repeat')),
+          'seek': find.descendant(
+            of: find.byType(SeekBar),
+            matching: find.byType(Slider),
+          ),
+        };
+        for (final MapEntry(:key, :value) in controls.entries) {
+          expect(
+            value.hitTestable(),
+            findsWidgets,
+            reason:
+                '$key reachable at $size, queue ${open ? 'open' : 'closed'}',
+          );
+        }
+        expect(tester.takeException(), isNull, reason: 'overflow at $size');
+        await _render(
+          tester,
+          '4b-landscape-${size.width.round()}-${open ? 'queue' : 'player'}',
+        );
+      }
+      await tester.tap(queuePill.hitTestable().first);
+      await _wait(tester, 900);
+    }
+    tester.view.resetPhysicalSize();
+    await _wait(tester, 900);
 
     // Next track.
     await tester.tap(find.byTooltip('Next').last);
@@ -400,6 +466,22 @@ Future<Map<String, dynamic>?> _client() async {
       .cast<Map<String, dynamic>>()
       .where((c) => c['pid'] == pid)
       .firstOrNull;
+}
+
+/// Flutter's own frame, for when the test resizes the view without resizing the window.
+Future<void> _render(WidgetTester tester, String name) async {
+  final dir = Platform.environment['HALCYN_SHOTS'];
+  if (dir == null) return;
+  final view = tester.binding.renderViews.first;
+  final layer = view.debugLayer! as OffsetLayer;
+  await tester.runAsync(() async {
+    final image = await layer.toImage(
+      Offset.zero & view.size,
+      pixelRatio: tester.view.devicePixelRatio,
+    );
+    final png = await image.toByteData(format: ImageByteFormat.png);
+    await File('$dir/$name.png').writeAsBytes(png!.buffer.asUint8List());
+  });
 }
 
 Future<void> _shot(String name) async {

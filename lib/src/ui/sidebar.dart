@@ -133,8 +133,6 @@ class Sidebar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          const NowPlayingCard(),
         ],
       ),
     );
@@ -162,108 +160,182 @@ class Sidebar extends StatelessWidget {
   }
 }
 
-/// The cover, title and signal of what's playing, docked at the bottom of the sidebar.
-/// Opens Now Playing.
+/// The cover, title and signal of what's playing, floating at the bottom right of the
+/// desktop window above the volume. Opens Now Playing; hides from its corner button or
+/// the player bar's [NowPlayingCardButton].
 class NowPlayingCard extends StatelessWidget {
   const NowPlayingCard({super.key});
 
+  static const width = 200.0;
+
   @override
   Widget build(BuildContext context) {
-    final player = AppScope.of(context).player;
+    final scope = AppScope.of(context);
+    final player = scope.player;
+    final shown = scope.themes.nowPlayingCard;
     return ListenableBuilder(
-      listenable: player,
+      listenable: Listenable.merge([player, shown]),
       builder: (context, _) {
         final track = player.current;
-        return AnimatedSize(
+        return AnimatedSwitcher(
           duration: Motion.medium,
-          curve: Motion.curve,
-          alignment: Alignment.bottomCenter,
-          child: track == null
-              ? const SizedBox(width: double.infinity)
-              : _card(context, track, player.signalPath),
+          switchInCurve: Motion.curve,
+          switchOutCurve: Motion.curve,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.9, end: 1.0).animate(animation),
+              alignment: Alignment.bottomRight,
+              child: child,
+            ),
+          ),
+          child: track == null || !shown.value
+              ? const SizedBox.shrink()
+              : _card(context, track, player.signalPath, shown),
         );
       },
     );
   }
 
-  Widget _card(BuildContext context, Track track, SignalPath? path) {
+  Widget _card(
+    BuildContext context,
+    Track track,
+    SignalPath? path,
+    ValueNotifier<bool> shown,
+  ) {
     final radius = BorderRadius.circular(Palette.r(16));
     return Material(
       color: Palette.surfaceHigh,
+      elevation: 12,
+      shadowColor: const Color(0xAA000000),
       shape: RoundedRectangleBorder(
         borderRadius: radius,
         side: BorderSide(color: Palette.outline),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => openNowPlaying(context),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              // Short windows trade the big cover for a thumbnail, keeping the
-              // playlists in view.
-              final big = MediaQuery.sizeOf(context).height >= 820;
-              final titles = AnimatedSwitcher(
-                duration: Motion.medium,
-                layoutBuilder: (current, previous) => Stack(
-                  alignment: Alignment.topLeft,
-                  children: [...previous, ?current],
-                ),
-                child: Column(
-                  key: ValueKey(track.id),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Palette.text,
+      child: SizedBox(
+        width: width,
+        child: Stack(
+          children: [
+            InkWell(
+              onTap: () => openNowPlaying(context),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: _contents(context, track, path),
+              ),
+            ),
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Material(
+                color: const Color(0x99000000),
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => shown.value = false,
+                  child: const Tooltip(
+                    message: 'Hide',
+                    child: Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: Colors.white,
                       ),
                     ),
-                    Text(
-                      track.artists.join(', '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: Palette.textMuted),
-                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _contents(BuildContext context, Track track, SignalPath? path) =>
+      LayoutBuilder(
+        builder: (context, box) {
+          // Short windows get a thumbnail, so the card covers less of the list.
+          final big = MediaQuery.sizeOf(context).height >= 640;
+          final titles = AnimatedSwitcher(
+            duration: Motion.medium,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topLeft,
+              children: [...previous, ?current],
+            ),
+            child: Column(
+              key: ValueKey(track.id),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  track.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Palette.text,
+                  ),
+                ),
+                Text(
+                  track.artists.join(', '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Palette.textMuted),
+                ),
+              ],
+            ),
+          );
+          final art = Hero(
+            tag: nowPlayingArtTag,
+            child: Artwork(
+              art: track.art,
+              size: big ? box.maxWidth : 40,
+              resolution: big ? ArtSize.medium : ArtSize.small,
+              radius: big ? 12 : 8,
+            ),
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (big) ...[
+                art,
+                const SizedBox(height: 8),
+                titles,
+              ] else
+                Row(
+                  children: [
+                    art,
+                    const SizedBox(width: 10),
+                    Expanded(child: titles),
                   ],
                 ),
-              );
-              final art = Hero(
-                tag: nowPlayingArtTag,
-                child: Artwork(
-                  art: track.art,
-                  size: big ? box.maxWidth : 40,
-                  resolution: big ? ArtSize.medium : ArtSize.small,
-                  radius: big ? 12 : 8,
-                ),
-              );
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (big) ...[
-                    art,
-                    const SizedBox(height: 8),
-                    titles,
-                  ] else
-                    Row(
-                      children: [
-                        art,
-                        const SizedBox(width: 10),
-                        Expanded(child: titles),
-                      ],
-                    ),
-                  const SizedBox(height: 6),
-                  RateChip(track: track, path: path),
-                ],
-              );
-            },
-          ),
-        ),
+              const SizedBox(height: 6),
+              RateChip(track: track, path: path),
+            ],
+          );
+        },
+      );
+}
+
+/// Shows or hides the [NowPlayingCard].
+class NowPlayingCardButton extends StatelessWidget {
+  const NowPlayingCardButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = AppScope.of(context).themes.nowPlayingCard;
+    return ValueListenableBuilder(
+      valueListenable: shown,
+      builder: (context, on, _) => IconButton(
+        onPressed: () => shown.value = !on,
+        isSelected: on,
+        icon: const Icon(Icons.image_outlined),
+        selectedIcon: Icon(Icons.image_rounded, color: Palette.accentLight),
+        iconSize: 20,
+        color: Palette.textMuted,
+        tooltip: on ? 'Hide the cover card' : 'Show the cover card',
       ),
     );
   }

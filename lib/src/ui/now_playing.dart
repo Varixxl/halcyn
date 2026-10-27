@@ -142,7 +142,10 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                                 message: 'Nothing playing.',
                               )
                             : LayoutBuilder(
-                                builder: (context, box) => box.maxWidth >= 860
+                                // Short screens (a phone on its side) use the narrow
+                                // layout's landscape arrangement at any width.
+                                builder: (context, box) =>
+                                    box.maxWidth >= 860 && box.maxHeight >= 520
                                     ? _WideLayout(box: box, panel: panel)
                                     : _NarrowLayout(box: box, panel: panel),
                               ),
@@ -217,6 +220,7 @@ class _NarrowLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final open = panel != NowPlayingPanel.none;
+    final landscape = box.maxWidth > box.maxHeight && box.maxHeight < 520;
     return AnimatedSwitcher(
       duration: Motion.slow,
       switchInCurve: Motion.curve,
@@ -231,7 +235,35 @@ class _NarrowLayout extends StatelessWidget {
           child: child,
         ),
       ),
-      child: open
+      child: open && landscape
+          // A phone on its side: the controls beside the panel, which keeps the height.
+          ? Padding(
+              key: const ValueKey('panel'),
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: min(360, box.maxWidth * 0.45),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _Header(),
+                        SizedBox(height: 16),
+                        SeekBar(),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _Transport(compact: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(child: _PanelView(panel: panel)),
+                ],
+              ),
+            )
+          : open
           ? Padding(
               key: const ValueKey('panel'),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -246,6 +278,15 @@ class _NarrowLayout extends StatelessWidget {
                   const SizedBox(height: 4),
                   const _Transport(compact: true),
                 ],
+              ),
+            )
+          // A phone on its side: the player fits the screen rather than scrolling.
+          : box.maxWidth > box.maxHeight && box.maxHeight < 520
+          ? Padding(
+              key: const ValueKey('player'),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: LayoutBuilder(
+                builder: (context, box) => Center(child: _Player(box: box)),
               ),
             )
           : ListView(
@@ -311,7 +352,8 @@ class _PanelViewState extends State<_PanelView> {
 }
 
 /// The cover with the titles, seek bar and transport underneath, sized to fit `box`.
-/// The signal path card goes below when there's height to spare.
+/// The signal path card goes below when there's height to spare. Too short to stack (a
+/// phone on its side), the controls go beside the cover instead.
 class _Player extends StatelessWidget {
   const _Player({required this.box});
 
@@ -328,6 +370,47 @@ class _Player extends StatelessWidget {
       listenable: player,
       builder: (context, _) {
         final width = box.maxWidth;
+        final error = player.error;
+        final errorText = error == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  error,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              );
+        if (box.maxHeight.isFinite && box.maxHeight - _controls < 200) {
+          final art = min(box.maxHeight, width * 0.42).clamp(96.0, 520.0);
+          return SizedBox(
+            width: min(width, art + 28 + 480),
+            child: Row(
+              children: [
+                _Cover(size: art),
+                const SizedBox(width: 28),
+                Expanded(
+                  // Scrolls if even the controls alone don't fit.
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const _Titles(),
+                        const SizedBox(height: 10),
+                        const SeekBar(),
+                        const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: _Transport(compact: true),
+                        ),
+                        ?errorText,
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         final fit = [width, box.maxHeight - _controls, 520.0].reduce(min);
         final withCard = [
           width,
@@ -336,7 +419,6 @@ class _Player extends StatelessWidget {
         ].reduce(min);
         final card = player.signalPath != null && withCard >= 280;
         final art = (card ? withCard : fit).clamp(160.0, 520.0);
-        final error = player.error;
         return SizedBox(
           width: max(art, min(width, 340.0)),
           child: Column(
@@ -350,16 +432,7 @@ class _Player extends StatelessWidget {
               const SeekBar(),
               const SizedBox(height: 4),
               const _Transport(),
-              if (error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    error,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
+              ?errorText,
               AnimatedSize(
                 duration: Motion.medium,
                 curve: Motion.curve,

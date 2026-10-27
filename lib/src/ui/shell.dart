@@ -210,14 +210,23 @@ class _ShellState extends State<Shell> {
                   ? Column(
                       children: [
                         Expanded(
-                          child: Row(
+                          child: Stack(
                             children: [
-                              Sidebar(
-                                section: _section.value,
-                                onSelect: _select,
-                                search: _searchField(global: true),
+                              Row(
+                                children: [
+                                  Sidebar(
+                                    section: _section.value,
+                                    onSelect: _select,
+                                    search: _searchField(global: true),
+                                  ),
+                                  Expanded(child: content),
+                                ],
                               ),
-                              Expanded(child: content),
+                              const Positioned(
+                                right: 16,
+                                bottom: 12,
+                                child: NowPlayingCard(),
+                              ),
                             ],
                           ),
                         ),
