@@ -150,7 +150,14 @@ class AndroidEnvironment {
     final toolTempDir =
         Platform.environment['CARGOKIT_TOOL_TEMP_DIR'] ?? targetTempDir;
 
+    // bindgen (rquickjs-sys generates its Android bindings) must read the NDK's
+    // headers, not the build machine's.
+    final bindgenKey = 'BINDGEN_EXTRA_CLANG_ARGS_${target.rust.replaceAll('-', '_')}';
+    final bindgenValue =
+        '$targetArg --sysroot=${path.join(toolchainPath, '..', 'sysroot')}';
+
     return {
+      bindgenKey: bindgenValue,
       arKey: arValue,
       ccKey: ccValue,
       cfFlagsKey: cFlagsValue,

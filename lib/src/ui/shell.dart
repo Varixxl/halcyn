@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../state/plugins.dart';
 import '../theme.dart';
 import 'albums_page.dart';
 import 'artists_page.dart';
 import 'places.dart';
+import 'now_playing.dart';
 import 'player_bar.dart';
+import 'plugin_view.dart';
 import 'playlists_page.dart';
+import 'plugins_page.dart';
 import 'queue_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
@@ -16,25 +22,17 @@ import 'songs_page.dart';
 import 'track_list.dart';
 import 'widgets.dart';
 
-/// The phone layout's tabs.
-const _tabs = [
-  (
-    icon: Icons.library_music_outlined,
-    selected: Icons.library_music_rounded,
-    label: 'Library',
-  ),
-  (icon: Icons.search_rounded, selected: Icons.search_rounded, label: 'Search'),
-  (
-    icon: Icons.queue_music_outlined,
-    selected: Icons.queue_music_rounded,
-    label: 'Playlists',
-  ),
-  (
-    icon: Icons.settings_outlined,
-    selected: Icons.settings_rounded,
-    label: 'Settings',
-  ),
-];
+/// A phone tab.
+typedef _Tab = ({
+  IconData icon,
+  IconData selected,
+  String label,
+  VoidCallback open,
+  bool Function() shown,
+});
+
+/// Plugins' tabs in the phone's bottom bar, at most.
+const _maxPluginTabs = 2;
 
 /// The sidebar (or, on a phone, the tabs), the page area with its own navigator so
 /// album and artist pages open inside it, and the docked player.
@@ -66,8 +64,49 @@ class _ShellState extends State<Shell> {
   /// Phone layout: the Search tab is open.
   bool _searching = false;
 
+  StreamSubscription<String>? _navigation;
+  PluginManager? _plugins;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final plugins = AppScope.of(context).plugins;
+    if (plugins != _plugins) {
+      _plugins?.removeListener(_pluginsChanged);
+      _navigation?.cancel();
+      _plugins = plugins..addListener(_pluginsChanged);
+      _navigation = plugins.navigation.stream.listen(_navigate);
+    }
+  }
+
+  /// Plugins add tabs and hide or replace built-in ones.
+  void _pluginsChanged() => setState(() {});
+
+  /// Where a plugin asked to go (`halcyn.ui.navigate`).
+  void _navigate(String target) {
+    if (!mounted) return;
+    if (int.tryParse(target) case final key?) {
+      return _select(Section(Place.pluginPage, key));
+    }
+    if (target == 'nowPlaying') return openNowPlaying(context);
+    final place = switch (target) {
+      'songs' => Place.songs,
+      'albums' => Place.albums,
+      'artists' => Place.artists,
+      'queue' => Place.queue,
+      'playlists' => Place.playlists,
+      'search' => Place.search,
+      'settings' => Place.settings,
+      'plugins' => Place.plugins,
+      _ => null,
+    };
+    if (place != null) _select(Section(place));
+  }
+
   @override
   void dispose() {
+    _navigation?.cancel();
+    _plugins?.removeListener(_pluginsChanged);
     _search.dispose();
     _searchFocus.dispose();
     _global.dispose();
@@ -123,7 +162,12 @@ class _ShellState extends State<Shell> {
   }
 
   bool get _searchable => switch (_section.value.place) {
-    Place.queue || Place.settings || Place.playlists || Place.search => false,
+    Place.queue ||
+    Place.settings ||
+    Place.playlists ||
+    Place.search ||
+    Place.plugins ||
+    Place.pluginPage => false,
     _ => true,
   };
 
@@ -135,40 +179,75 @@ class _ShellState extends State<Shell> {
     Place.settings => 4,
     Place.playlists => 5,
     Place.search => 7,
+    Place.plugins => 8,
+    Place.pluginPage => 9,
     _ => 6,
   };
+
+  /// A built-in page, or what a plugin shows instead of it.
+  Widget _builtIn(PluginManager plugins, String tab, Widget page) =>
+      switch (plugins.replacement(tab)) {
+        final r? => PluginPageView(
+          key: ValueKey('$tab ${r.key}'),
+          pageKey: r.key,
+        ),
+        null => page,
+      };
 
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 720;
+    final plugins = AppScope.of(context).plugins;
 
     final pages = Navigator(
       key: _pages,
       observers: [HeroController()],
       onGenerateRoute: (_) => PageRouteBuilder(
         pageBuilder: (_, _, _) => ListenableBuilder(
-          listenable: Listenable.merge([_section, _query, _globalQuery]),
+          listenable: Listenable.merge([
+            _section,
+            _query,
+            _globalQuery,
+            plugins,
+          ]),
           builder: (context, _) => FadeIndexedStack(
             index: _stackIndex(_section.value.place),
             children: [
-              SongsPage(query: _query.value),
-              AlbumsPage(query: _query.value),
-              ArtistsPage(query: _query.value),
-              const QueuePage(),
+              _builtIn(plugins, 'songs', SongsPage(query: _query.value)),
+              _builtIn(plugins, 'albums', AlbumsPage(query: _query.value)),
+              _builtIn(plugins, 'artists', ArtistsPage(query: _query.value)),
+              _builtIn(plugins, 'queue', const QueuePage()),
               const SettingsPage(),
-              PlaylistsPage(onOpen: _select, onCreate: _createPlaylist),
-              AnimatedSwitcher(
-                duration: SlateMotion.page,
-                switchInCurve: Motion.curve,
-                switchOutCurve: Motion.curve,
-                child: CollectionPage(
-                  key: ValueKey(_collection),
-                  section: _collection,
-                  query: _query.value,
-                  onDeleted: () => _select(const Section(Place.songs)),
+              _builtIn(
+                plugins,
+                'playlists',
+                PlaylistsPage(onOpen: _select, onCreate: _createPlaylist),
+              ),
+              _builtIn(
+                plugins,
+                _collection.place.smart ? 'smartPlaylists' : 'playlists',
+                AnimatedSwitcher(
+                  duration: SlateMotion.page,
+                  switchInCurve: Motion.curve,
+                  switchOutCurve: Motion.curve,
+                  child: CollectionPage(
+                    key: ValueKey(_collection),
+                    section: _collection,
+                    query: _query.value,
+                    onDeleted: () => _select(const Section(Place.songs)),
+                  ),
                 ),
               ),
-              SearchPage(query: _globalQuery.value, onOpen: _select),
+              _builtIn(
+                plugins,
+                'search',
+                SearchPage(query: _globalQuery.value, onOpen: _select),
+              ),
+              const PluginsPage(),
+              PluginPageView(
+                key: ValueKey(_section.value.playlist),
+                pageKey: _section.value.playlist ?? 0,
+              ),
             ],
           ),
         ),
@@ -189,8 +268,10 @@ class _ShellState extends State<Shell> {
 
     return Shortcuts(
       // The player's own shortcuts live in WindowFrame, above the mini player too.
-      shortcuts: const {
-        SingleActivator(LogicalKeyboardKey.keyF, control: true): _Search(),
+      shortcuts: {
+        if (!plugins.isHidden('search'))
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+              const _Search(),
       },
       child: Actions(
         actions: {
@@ -217,7 +298,9 @@ class _ShellState extends State<Shell> {
                                   Sidebar(
                                     section: _section.value,
                                     onSelect: _select,
-                                    search: _searchField(global: true),
+                                    search: plugins.isHidden('search')
+                                        ? null
+                                        : _searchField(global: true),
                                   ),
                                   Expanded(
                                     child: NowPlayingCardInset(child: content),
@@ -246,17 +329,24 @@ class _ShellState extends State<Shell> {
             ),
             bottomNavigationBar: wide
                 ? null
-                : NavigationBar(
-                    selectedIndex: _tab,
-                    onDestinationSelected: _selectTab,
-                    destinations: [
-                      for (final t in _tabs)
-                        NavigationDestination(
-                          icon: Icon(t.icon),
-                          selectedIcon: Icon(t.selected),
-                          label: t.label,
-                        ),
-                    ],
+                : ListenableBuilder(
+                    listenable: plugins,
+                    builder: (context, _) {
+                      final tabs = _phoneTabs(plugins);
+                      final selected = tabs.indexWhere((t) => t.shown());
+                      return NavigationBar(
+                        selectedIndex: selected < 0 ? 0 : selected,
+                        onDestinationSelected: (i) => tabs[i].open(),
+                        destinations: [
+                          for (final t in tabs)
+                            NavigationDestination(
+                              icon: Icon(t.icon),
+                              selectedIcon: Icon(t.selected),
+                              label: t.label,
+                            ),
+                        ],
+                      );
+                    },
                   ),
           ),
         ),
@@ -264,32 +354,75 @@ class _ShellState extends State<Shell> {
     );
   }
 
-  int get _tab => switch (_section.value.place) {
-    Place.settings => 3,
-    Place.search => 1,
-    Place.playlists || Place.playlist => 2,
-    final p when p.smart => 2,
-    _ => _searching ? 1 : 0,
-  };
-
-  void _selectTab(int tab) {
-    switch (tab) {
-      case 0:
-        _select(const Section(Place.songs));
-      case 1:
-        _focusGlobal(phone: true);
-      case 2:
-        _select(const Section(Place.playlists));
-      case 3:
-        _select(const Section(Place.settings));
-    }
+  /// The phone's bottom bar: Library, Search, Playlists, plugins' main tabs, Settings.
+  /// Library (first) is selected when no other tab is.
+  List<_Tab> _phoneTabs(PluginManager plugins) {
+    final place = _section.value.place;
+    final library = [
+      for (final (tab, p) in [
+        ('songs', Place.songs),
+        ('albums', Place.albums),
+        ('artists', Place.artists),
+        ('queue', Place.queue),
+      ])
+        if (!plugins.isHidden(tab)) p,
+    ];
+    final playlists =
+        !plugins.isHidden('playlists') || !plugins.isHidden('smartPlaylists');
+    return [
+      (
+        icon: Icons.library_music_outlined,
+        selected: Icons.library_music_rounded,
+        label: 'Library',
+        open: () => _select(Section(library.firstOrNull ?? Place.songs)),
+        shown: () => false,
+      ),
+      if (!plugins.isHidden('search'))
+        (
+          icon: Icons.search_rounded,
+          selected: Icons.search_rounded,
+          label: 'Search',
+          open: () => _focusGlobal(phone: true),
+          shown: () => place == Place.search || _searching,
+        ),
+      if (playlists)
+        (
+          icon: Icons.queue_music_outlined,
+          selected: Icons.queue_music_rounded,
+          label: 'Playlists',
+          open: () => _select(const Section(Place.playlists)),
+          shown: () =>
+              place == Place.playlists ||
+              place == Place.playlist ||
+              place.smart,
+        ),
+      for (final t in plugins.tabs(TabPlace.main).take(_maxPluginTabs))
+        _pluginTab(t),
+      (
+        icon: Icons.settings_outlined,
+        selected: Icons.settings_rounded,
+        label: 'Settings',
+        open: () => _select(const Section(Place.settings)),
+        shown: () => place == Place.settings || place == Place.plugins,
+      ),
+    ];
   }
+
+  _Tab _pluginTab(PluginPage t) => (
+    icon: pluginIcon(t.icon),
+    selected: pluginIcon(t.icon),
+    label: t.title,
+    open: () => _select(Section(Place.pluginPage, t.key)),
+    shown: () =>
+        _section.value.place == Place.pluginPage &&
+        _section.value.playlist == t.key,
+  );
 
   /// Desktop: the page's name on the left, search on the right.
   Widget _topBar(BuildContext context) {
-    final library = AppScope.of(context).library;
+    final scope = AppScope.of(context);
     return ListenableBuilder(
-      listenable: library,
+      listenable: Listenable.merge([scope.library, scope.plugins]),
       builder: (context, _) => _buildTopBar(context),
     );
   }
@@ -297,13 +430,28 @@ class _ShellState extends State<Shell> {
   Widget _buildTopBar(BuildContext context) {
     final library = AppScope.of(context).library;
     final place = _section.value.place;
+    final plugins = AppScope.of(context).plugins;
+    final replaced = switch (place) {
+      Place.songs => plugins.replacement('songs'),
+      Place.albums => plugins.replacement('albums'),
+      Place.artists => plugins.replacement('artists'),
+      Place.queue => plugins.replacement('queue'),
+      Place.search => plugins.replacement('search'),
+      _ => null,
+    };
     final (title, count) = switch (place) {
+      _ when replaced != null => (replaced.title, null),
       Place.songs => ('Songs', library.tracks.length),
       Place.albums => ('Albums', library.albums.length),
       Place.artists => ('Artists', library.artists.length),
       Place.queue => ('Queue', null),
       Place.settings => ('Settings', null),
       Place.search => ('Search', null),
+      Place.plugins => ('Plugins', null),
+      Place.pluginPage => (
+        plugins.page(_section.value.playlist ?? 0)?.title ?? '',
+        null,
+      ),
       _ => ('', null),
     };
     return SizedBox(
@@ -323,7 +471,8 @@ class _ShellState extends State<Shell> {
             ),
           ],
           const Spacer(),
-          if (_searchable) SizedBox(width: 280, child: _searchField()),
+          if (_searchable && replaced == null)
+            SizedBox(width: 280, child: _searchField()),
         ],
       ),
     );
@@ -351,11 +500,17 @@ class _ShellState extends State<Shell> {
         ),
       );
     }
-    if (place == Place.settings || place == Place.playlists) {
+    final plugins = AppScope.of(context).plugins;
+    final page = place == Place.pluginPage
+        ? plugins.page(_section.value.playlist ?? 0)
+        : null;
+    if (place == Place.settings ||
+        place == Place.playlists ||
+        page?.place == TabPlace.main) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
         child: Text(
-          place == Place.settings ? 'Settings' : 'Playlists',
+          page?.title ?? (place == Place.settings ? 'Settings' : 'Playlists'),
           style: Theme.of(context).textTheme.headlineSmall,
         ),
       );
@@ -365,16 +520,28 @@ class _ShellState extends State<Shell> {
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
       child: Row(
         children: [
-          for (final (p, label) in [
-            (Place.songs, 'Songs'),
-            (Place.albums, 'Albums'),
-            (Place.artists, 'Artists'),
-            (Place.queue, 'Queue'),
+          for (final (tab, p, label) in [
+            ('songs', Place.songs, 'Songs'),
+            ('albums', Place.albums, 'Albums'),
+            ('artists', Place.artists, 'Artists'),
+            ('queue', Place.queue, 'Queue'),
+          ])
+            if (!plugins.isHidden(tab)) ...[
+              Pill(
+                label: plugins.replacement(tab)?.title ?? label,
+                selected: place == p,
+                onPressed: () => _select(Section(p)),
+              ),
+              const SizedBox(width: 8),
+            ],
+          for (final t in [
+            ...plugins.tabs(TabPlace.library),
+            ...plugins.tabs(TabPlace.sidebar),
           ]) ...[
-            Pill(
-              label: label,
-              selected: place == p,
-              onPressed: () => _select(Section(p)),
+            pluginTabPill(
+              t,
+              selected: page?.key == t.key,
+              onPressed: () => _select(Section(Place.pluginPage, t.key)),
             ),
             const SizedBox(width: 8),
           ],

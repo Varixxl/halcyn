@@ -1,5 +1,6 @@
 import '../cast/receiver.dart';
 import '../cast/sender.dart';
+import '../state/plugins.dart';
 import '../state/updater.dart';
 
 import 'dart:io';
@@ -34,6 +35,7 @@ class AppScope extends InheritedWidget {
     required this.cast,
     required this.receiver,
     required this.updater,
+    required this.plugins,
     required super.child,
   });
 
@@ -49,6 +51,7 @@ class AppScope extends InheritedWidget {
   final CastController cast;
   final CastReceiver receiver;
   final Updater updater;
+  final PluginManager plugins;
 
   static AppScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!;

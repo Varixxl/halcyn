@@ -4,6 +4,7 @@ import '../theme.dart';
 import 'cast.dart';
 import 'equalizer.dart';
 import 'now_playing.dart';
+import 'plugin_view.dart';
 import 'sidebar.dart';
 import 'slate.dart';
 import 'widgets.dart';
@@ -63,6 +64,7 @@ class PlayerBar extends StatelessWidget {
               const SizedBox(width: 12),
               const Expanded(child: SeekBar(compact: true)),
               const SizedBox(width: 12),
+              const PluginPlayerButtons(),
               Pill(
                 label: 'Lyrics',
                 icon: Icons.lyrics_outlined,

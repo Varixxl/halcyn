@@ -26,6 +26,12 @@ class ThemeController extends ChangeNotifier {
   final nowPlayingCard = ValueNotifier(true);
   List<HalcynTheme> themes = const [HalcynTheme.lapisVelvetEvening];
 
+  /// Halcyn's own, without plugins' themes.
+  List<HalcynTheme> _builtIn = const [HalcynTheme.lapisVelvetEvening];
+
+  /// The saved choice, kept in case it's a plugin's theme that isn't there yet.
+  String? _saved;
+
   HalcynTheme get current => Palette.theme;
 
   /// Loads the templates and applies the saved choice. A template that fails to parse
@@ -54,7 +60,7 @@ class ThemeController extends ChangeNotifier {
       if (a.dark != b.dark) return a.dark ? -1 : 1;
       return a.name.compareTo(b.name);
     });
-    themes = List.unmodifiable(loaded);
+    themes = _builtIn = List.unmodifiable(loaded);
 
     String? saved;
     try {
@@ -64,14 +70,32 @@ class ThemeController extends ChangeNotifier {
     } on Object {
       // No settings yet.
     }
+    _saved = saved;
     Palette.theme = themes.firstWhere(
       (t) => t.id == (saved ?? defaultId),
       orElse: () => themes.first,
     );
   }
 
+  /// Plugins' themes, after Halcyn's own. Applies the saved choice once its plugin
+  /// has added it, and leaves a plugin's theme that went away.
+  void setExtra(List<HalcynTheme> extra) {
+    themes = List.unmodifiable([..._builtIn, ...extra]);
+    final saved = themes.where((t) => t.id == _saved).firstOrNull;
+    if (saved != null && saved.id != current.id) {
+      Palette.theme = saved;
+    } else if (!themes.any((t) => t.id == current.id)) {
+      Palette.theme = themes.firstWhere(
+        (t) => t.id == defaultId,
+        orElse: () => themes.first,
+      );
+    }
+    notifyListeners();
+  }
+
   Future<void> select(HalcynTheme theme) async {
     if (theme.id == current.id) return;
+    _saved = theme.id;
     Palette.theme = theme;
     notifyListeners();
     await _save();

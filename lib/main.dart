@@ -16,8 +16,10 @@ import 'src/state/playlists.dart';
 import 'src/state/sort.dart';
 import 'src/state/sound.dart';
 import 'src/state/themes.dart';
+import 'src/state/plugins.dart';
 import 'src/state/updater.dart';
 import 'src/theme.dart';
+import 'src/ui/plugins_page.dart';
 import 'src/ui/cast.dart';
 import 'src/ui/shell.dart';
 import 'src/ui/updates.dart';
@@ -91,14 +93,28 @@ Future<void> main(List<String> args) async {
   if (listening || Platform.environment.containsKey('HALCYN_CAST_PORT')) {
     await receiver.load();
   }
+  final version = (await PackageInfo.fromPlatform()).version;
   final updater = Updater(
     settings: File('${data.path}/update.json'),
     cacheDir: cache,
-    current: (await PackageInfo.fromPlatform()).version,
+    current: version,
     persist: listening,
   );
   await updater.load();
   if (listening) updater.checkLater();
+  // A test gets an empty plugins folder of its own.
+  final plugins = PluginManager(
+    dir: Directory(
+      listening ? '${data.path}/plugins' : '${cache.path}/plugins-test',
+    ),
+    player: player,
+    library: library,
+    playlists: playlists,
+    sound: sound,
+    themes: themes,
+    appVersion: version,
+  );
+  await plugins.load();
   await Future.wait([
     access.start(),
     MediaSession.start(player, library, artDir),
@@ -121,6 +137,7 @@ Future<void> main(List<String> args) async {
       cast: cast,
       receiver: receiver,
       updater: updater,
+      plugins: plugins,
       child: const HalcynApp(),
     ),
   );
@@ -185,7 +202,12 @@ class _HalcynAppState extends State<HalcynApp> {
       themeAnimationDuration: Duration.zero,
       navigatorKey: appNavigator,
       builder: (context, child) => UpdatePrompt(
-        child: PairingPrompts(child: WindowFrame(child: child!)),
+        child: PairingPrompts(
+          child: PluginHost(
+            navigator: appNavigator,
+            child: WindowFrame(child: child!),
+          ),
+        ),
       ),
       home: const Shell(),
     );

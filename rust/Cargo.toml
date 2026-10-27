@@ -21,6 +21,7 @@ rtrb = "0.4.1"
 rubato = "5.0.1"
 rusqlite = { version = "0.41.0", features = ["bundled"] }
 symphonia = { version = "0.6.1", default-features = false, features = ["flac", "mp3", "aac", "alac", "vorbis", "pcm", "wav", "aiff", "ogg", "isomp4", "mkv", "caf"] }
+rquickjs = "0.14.0"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
@@ -29,4 +30,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 pipewire = { version = "0.10.1", features = ["v0_3_65"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
+# rquickjs ships no prebuilt bindings for Android targets; generate them from the NDK.
+rquickjs = { version = "0.14.0", features = ["bindgen"] }
 ndk-context = "0.1.1"

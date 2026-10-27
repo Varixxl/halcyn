@@ -7,6 +7,7 @@ import '../state/library.dart';
 import '../state/sort.dart';
 import '../theme.dart';
 import 'places.dart';
+import 'plugin_view.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -441,6 +442,7 @@ Future<void> showTrackMenu(
   String removeLabel = 'Remove from playlist',
 }) async {
   final scope = AppScope.of(context);
+  final actions = scope.plugins.trackActions;
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   PopupMenuItem<String> item(String value, IconData icon, String label) =>
       PopupMenuItem(
@@ -468,6 +470,8 @@ Future<void> showTrackMenu(
       item('playlist', Icons.playlist_add_rounded, 'Add to playlist…'),
       if (onRemove != null)
         item('remove', Icons.remove_circle_outline_rounded, removeLabel),
+      for (final (i, action) in actions.indexed)
+        item('plugin $i', Icons.extension_outlined, action.title),
     ],
   );
   if (!context.mounted) return;
@@ -482,6 +486,8 @@ Future<void> showTrackMenu(
       await addToPlaylist(context, [track]);
     case 'remove':
       onRemove!();
+    case final String c when c.startsWith('plugin '):
+      await runPluginAction(context, actions[int.parse(c.substring(7))], track);
   }
 }
 

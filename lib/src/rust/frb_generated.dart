@@ -5,6 +5,7 @@
 
 import 'api/library.dart';
 import 'api/player.dart';
+import 'api/plugins.dart';
 import 'api/sound.dart';
 
 import 'dart:async';
@@ -71,7 +72,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1063025783;
+  int get rustContentHash => 850643252;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -165,6 +166,35 @@ abstract class RustLibApi extends BaseApi {
   void crateApiPlayerPlayerSpectrumStop();
 
   void crateApiPlayerPlayerStop();
+
+  void crateApiPluginsPluginEmit({
+    required String id,
+    required String event,
+    required String json,
+  });
+
+  void crateApiPluginsPluginInvoke({
+    required String id,
+    required int callback,
+    required String json,
+    required int reply,
+  });
+
+  void crateApiPluginsPluginReply({
+    required String id,
+    required int call,
+    required bool ok,
+    required String json,
+  });
+
+  Stream<PluginRequest> crateApiPluginsPluginRequests();
+
+  Future<void> crateApiPluginsPluginStart({
+    required String id,
+    required String source,
+  });
+
+  void crateApiPluginsPluginStop({required String id});
 
   Future<Repeat> crateApiPlayerRepeatDefault();
 
@@ -946,6 +976,193 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "player_stop", argNames: []);
 
   @override
+  void crateApiPluginsPluginEmit({
+    required String id,
+    required String event,
+    required String json,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_String(event, serializer);
+          sse_encode_String(json, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPluginsPluginEmitConstMeta,
+        argValues: [id, event, json],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginEmitConstMeta => const TaskConstMeta(
+    debugName: "plugin_emit",
+    argNames: ["id", "event", "json"],
+  );
+
+  @override
+  void crateApiPluginsPluginInvoke({
+    required String id,
+    required int callback,
+    required String json,
+    required int reply,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_u_32(callback, serializer);
+          sse_encode_String(json, serializer);
+          sse_encode_u_32(reply, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPluginsPluginInvokeConstMeta,
+        argValues: [id, callback, json, reply],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginInvokeConstMeta =>
+      const TaskConstMeta(
+        debugName: "plugin_invoke",
+        argNames: ["id", "callback", "json", "reply"],
+      );
+
+  @override
+  void crateApiPluginsPluginReply({
+    required String id,
+    required int call,
+    required bool ok,
+    required String json,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_u_32(call, serializer);
+          sse_encode_bool(ok, serializer);
+          sse_encode_String(json, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPluginsPluginReplyConstMeta,
+        argValues: [id, call, ok, json],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginReplyConstMeta => const TaskConstMeta(
+    debugName: "plugin_reply",
+    argNames: ["id", "call", "ok", "json"],
+  );
+
+  @override
+  Stream<PluginRequest> crateApiPluginsPluginRequests() {
+    final sink = RustStreamSink<PluginRequest>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_plugin_request_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 31,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiPluginsPluginRequestsConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginRequestsConstMeta =>
+      const TaskConstMeta(debugName: "plugin_requests", argNames: ["sink"]);
+
+  @override
+  Future<void> crateApiPluginsPluginStart({
+    required String id,
+    required String source,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_String(source, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiPluginsPluginStartConstMeta,
+        argValues: [id, source],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginStartConstMeta => const TaskConstMeta(
+    debugName: "plugin_start",
+    argNames: ["id", "source"],
+  );
+
+  @override
+  void crateApiPluginsPluginStop({required String id}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPluginsPluginStopConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPluginsPluginStopConstMeta =>
+      const TaskConstMeta(debugName: "plugin_stop", argNames: ["id"]);
+
+  @override
   Future<Repeat> crateApiPlayerRepeatDefault() {
     return handler.executeNormal(
       NormalTask(
@@ -954,7 +1171,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 34,
             port: port_,
           );
         },
@@ -978,7 +1195,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_prim_f_64_strict,
@@ -1001,7 +1218,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_sound_settings(settings, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_sound_info,
@@ -1033,6 +1250,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<PlayerEvent> dco_decode_StreamSink_player_event_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<PluginRequest> dco_decode_StreamSink_plugin_request_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1254,6 +1479,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PluginRequest dco_decode_plugin_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return PluginRequest(
+      plugin: dco_decode_String(arr[0]),
+      call: dco_decode_u_32(arr[1]),
+      method: dco_decode_String(arr[2]),
+      args: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
   Repeat dco_decode_repeat(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Repeat.values[raw as int];
@@ -1389,6 +1628,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<PlayerEvent> sse_decode_StreamSink_player_event_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<PluginRequest> sse_decode_StreamSink_plugin_request_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1655,6 +1902,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PluginRequest sse_decode_plugin_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_plugin = sse_decode_String(deserializer);
+    var var_call = sse_decode_u_32(deserializer);
+    var var_method = sse_decode_String(deserializer);
+    var var_args = sse_decode_String(deserializer);
+    return PluginRequest(
+      plugin: var_plugin,
+      call: var_call,
+      method: var_method,
+      args: var_args,
+    );
+  }
+
+  @protected
   Repeat sse_decode_repeat(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
@@ -1816,6 +2078,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_player_event,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_plugin_request_Sse(
+    RustStreamSink<PluginRequest> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_plugin_request,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -2093,6 +2372,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.id, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_list_String(self.paths, serializer);
+  }
+
+  @protected
+  void sse_encode_plugin_request(PluginRequest self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.plugin, serializer);
+    sse_encode_u_32(self.call, serializer);
+    sse_encode_String(self.method, serializer);
+    sse_encode_String(self.args, serializer);
   }
 
   @protected

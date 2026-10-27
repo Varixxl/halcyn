@@ -22,7 +22,13 @@ enum Place {
 
   /// Everything matching the sidebar's search.
   search,
-  settings;
+  settings,
+
+  /// Installing and managing plugins.
+  plugins,
+
+  /// A page a plugin added; the section's id is its [PluginPage.key].
+  pluginPage;
 
   bool get smart => SmartList.all.any((s) => s.place == this);
 }
@@ -33,7 +39,7 @@ class Section {
 
   final Place place;
 
-  /// The user playlist's id, for Place.playlist.
+  /// The user playlist's id for Place.playlist; the page's key for Place.pluginPage.
   final int? playlist;
 
   @override

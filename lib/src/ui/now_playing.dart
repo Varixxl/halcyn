@@ -13,6 +13,7 @@ import '../window.dart';
 import 'cast.dart';
 import 'equalizer.dart';
 import 'player_bar.dart';
+import 'plugin_view.dart';
 import 'queue_page.dart';
 import 'slate.dart';
 import 'visualizer.dart';
@@ -114,6 +115,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                               tooltip: 'Close (Esc)',
                             ),
                             const Spacer(),
+                            const PluginPlayerButtons(),
                             // Phones have their own volume keys, but those don't
                             // reach the device cast to.
                             if (MediaQuery.sizeOf(context).width >= 600 ||

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../rust/api/player.dart';
 import '../rust/api/library.dart';
+import '../state/plugins.dart';
 import '../signal_path_view.dart';
 import '../theme.dart';
 import '../window.dart';
 import 'now_playing.dart';
 import 'places.dart';
 import 'player_bar.dart';
+import 'plugin_view.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -26,8 +28,8 @@ class Sidebar extends StatelessWidget {
   final Section section;
   final ValueChanged<Section> onSelect;
 
-  /// The search across everything, above the library.
-  final Widget search;
+  /// The search across everything, above the library; null when a plugin hides it.
+  final Widget? search;
 
   @override
   Widget build(BuildContext context) {
@@ -69,68 +71,105 @@ class Sidebar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          search,
+          ?search,
           Expanded(
             child: ListenableBuilder(
               listenable: Listenable.merge([
                 scope.library,
                 scope.playlists,
                 scope.player,
+                scope.plugins,
               ]),
-              builder: (context, _) => ListView(
-                children: [
-                  const SectionLabel('Library'),
-                  _item(Place.songs, 'Songs', Icons.music_note_outlined),
-                  _item(Place.albums, 'Albums', Icons.album_outlined),
-                  _item(Place.artists, 'Artists', Icons.person_outline_rounded),
-                  _item(
-                    Place.queue,
-                    'Queue',
-                    Icons.queue_music_rounded,
-                    count: scope.player.current == null
-                        ? null
-                        : scope.player.upNext.length,
-                  ),
-                  const SectionLabel('Smart playlists'),
-                  for (final smart in SmartList.all)
+              builder: (context, _) {
+                final plugins = scope.plugins;
+                bool shown(String tab) => !plugins.isHidden(tab);
+                String name(String tab, String label) =>
+                    plugins.replacement(tab)?.title ?? label;
+                final library = [
+                  if (shown('songs'))
                     _item(
-                      smart.place,
-                      smart.name,
-                      smart.icon,
-                      count: smart.tracks(scope.library).length,
+                      Place.songs,
+                      name('songs', 'Songs'),
+                      Icons.music_note_outlined,
                     ),
-                  SectionLabel(
-                    'Playlists',
-                    trailing: IconButton(
-                      onPressed: () => _create(context),
-                      icon: const Icon(Icons.add_rounded),
-                      iconSize: 18,
-                      color: Palette.textMuted,
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'New playlist',
+                  if (shown('albums'))
+                    _item(
+                      Place.albums,
+                      name('albums', 'Albums'),
+                      Icons.album_outlined,
                     ),
-                  ),
-                  for (final p in scope.playlists.playlists)
-                    SideItem(
-                      label: p.name,
-                      icon: Icons.playlist_play_rounded,
-                      count: p.paths.length,
-                      selected: section == Section(Place.playlist, p.id),
-                      onTap: () => onSelect(Section(Place.playlist, p.id)),
+                  if (shown('artists'))
+                    _item(
+                      Place.artists,
+                      name('artists', 'Artists'),
+                      Icons.person_outline_rounded,
                     ),
-                  if (scope.playlists.playlists.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-                      child: Text(
-                        'Make one with +, or from any song\'s menu.',
-                        style: TextStyle(
-                          fontSize: 12,
+                  if (shown('queue'))
+                    _item(
+                      Place.queue,
+                      name('queue', 'Queue'),
+                      Icons.queue_music_rounded,
+                      count: scope.player.current == null
+                          ? null
+                          : scope.player.upNext.length,
+                    ),
+                  for (final t in plugins.tabs(TabPlace.library)) _tab(t),
+                ];
+                return ListView(
+                  children: [
+                    for (final t in plugins.tabs(TabPlace.main)) _tab(t),
+                    if (library.isNotEmpty) ...[
+                      const SectionLabel('Library'),
+                      ...library,
+                    ],
+                    if (shown('smartPlaylists')) ...[
+                      const SectionLabel('Smart playlists'),
+                      for (final smart in SmartList.all)
+                        _item(
+                          smart.place,
+                          smart.name,
+                          smart.icon,
+                          count: smart.tracks(scope.library).length,
+                        ),
+                    ],
+                    if (shown('playlists')) ...[
+                      SectionLabel(
+                        'Playlists',
+                        trailing: IconButton(
+                          onPressed: () => _create(context),
+                          icon: const Icon(Icons.add_rounded),
+                          iconSize: 18,
                           color: Palette.textMuted,
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'New playlist',
                         ),
                       ),
-                    ),
-                ],
-              ),
+                      for (final p in scope.playlists.playlists)
+                        SideItem(
+                          label: p.name,
+                          icon: Icons.playlist_play_rounded,
+                          count: p.paths.length,
+                          selected: section == Section(Place.playlist, p.id),
+                          onTap: () => onSelect(Section(Place.playlist, p.id)),
+                        ),
+                      if (scope.playlists.playlists.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                          child: Text(
+                            'Make one with +, or from any song\'s menu.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Palette.textMuted,
+                            ),
+                          ),
+                        ),
+                    ],
+                    const SectionLabel('Plugins'),
+                    for (final t in plugins.tabs(TabPlace.sidebar)) _tab(t),
+                    _item(Place.plugins, 'Manage plugins', Icons.tune_rounded),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -146,6 +185,13 @@ class Sidebar extends StatelessWidget {
         selected: section.place == place,
         onTap: () => onSelect(Section(place)),
       );
+
+  Widget _tab(PluginPage t) => SideItem(
+    label: t.title,
+    icon: pluginIcon(t.icon),
+    selected: section == Section(Place.pluginPage, t.key),
+    onTap: () => onSelect(Section(Place.pluginPage, t.key)),
+  );
 
   Future<void> _create(BuildContext context) async {
     final playlists = AppScope.of(context).playlists;

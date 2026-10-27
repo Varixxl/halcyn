@@ -153,7 +153,24 @@ class PlayerController extends ChangeNotifier {
     if (_remote != null) _onPosition(secs);
   }
 
-  void playTracks(List<Track> tracks, int start) {
+  /// Plugins' say before something plays from the app (see `PluginManager`): what to
+  /// play instead, or null to play nothing.
+  Future<({List<Track> tracks, int start})?> Function(
+    List<Track> tracks,
+    int start,
+  )?
+  beforePlay;
+
+  /// `hooks`: let [beforePlay] change it first.
+  void playTracks(List<Track> tracks, int start, {bool hooks = true}) {
+    if (hooks && beforePlay != null && tracks.isNotEmpty) {
+      beforePlay!(tracks, start).then((changed) {
+        if (changed != null) {
+          playTracks(changed.tracks, changed.start, hooks: false);
+        }
+      });
+      return;
+    }
     if (_remote case final remote?) {
       return remote.play(tracks, start, 'replace');
     }
@@ -200,7 +217,7 @@ class PlayerController extends ChangeNotifier {
     final unshuffled = _unshuffled;
     final wasShuffled = shuffle;
     shuffle = false;
-    playTracks(queue, i);
+    playTracks(queue, i, hooks: false);
     shuffle = wasShuffled;
     _unshuffled = unshuffled;
   }

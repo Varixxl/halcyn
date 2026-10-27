@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'cast.dart';
+import 'plugin_view.dart';
+import 'plugins_page.dart';
 import 'theme_picker.dart';
 import 'updates.dart';
 import 'widgets.dart';
@@ -14,9 +16,10 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final library = AppScope.of(context).library;
+    final plugins = AppScope.of(context).plugins;
 
     return ListenableBuilder(
-      listenable: library,
+      listenable: Listenable.merge([library, plugins]),
       builder: (context, _) {
         final scanning = library.scanning;
         return ListView(
@@ -122,6 +125,43 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const CastSettings(),
+            // Plugins' own settings.
+            for (final section in plugins.settingsSections) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                child: Text(section.title, style: theme.textTheme.titleMedium),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: PluginPageView(
+                  key: ValueKey(section.key),
+                  pageKey: section.key,
+                  embedded: true,
+                ),
+              ),
+            ],
+            // The sidebar has Plugins on a wide window; a phone reaches it here.
+            if (MediaQuery.sizeOf(context).width < 720) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                child: Text('Plugins', style: theme.textTheme.titleMedium),
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.extension_outlined),
+                title: const Text('Manage plugins'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                // Over the whole app, not under the Settings header.
+                onTap: () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => Scaffold(
+                      appBar: AppBar(title: const Text('Plugins')),
+                      body: const PluginsPage(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const UpdateSettings(),
           ],
         );

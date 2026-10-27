@@ -179,7 +179,7 @@ void main() {
     expect(find.byType(VisualizerBackdrop), findsNothing);
 
     // Albums, then one album.
-    await tester.tap(find.widgetWithText(SideItem, 'Albums'));
+    await _side(tester, 'Albums');
     await _wait(tester, 1200);
     await _shot('5-albums');
     await tester.tap(find.byType(AlbumTile).first);
@@ -189,7 +189,7 @@ void main() {
     await _wait(tester, 800);
 
     // A smart playlist.
-    await tester.tap(find.widgetWithText(SideItem, 'Hi-Res picks'));
+    await _side(tester, 'Hi-Res picks');
     await _wait(tester, 1000);
     for (final row in tester.widgetList<TrackRow>(find.byType(TrackRow))) {
       final t = row.track;
@@ -207,10 +207,14 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Create'));
     await _wait(tester, 1000);
     final made = scope.playlists.playlists.last;
+    // Gone even if a later step fails: playlists live in the real library.
+    addTearDown(() {
+      if (scope.playlists.byId(made.id) != null) scope.playlists.delete(made);
+    });
     expect(made.name, 'Halcyn test');
     expect(find.text('Halcyn test'), findsWidgets);
 
-    await tester.tap(find.widgetWithText(SideItem, 'Songs'));
+    await _side(tester, 'Songs');
     await _wait(tester, 800);
     await tester.tap(find.byType(TrackRow).first, buttons: kSecondaryButton);
     await _wait(tester, 600);
@@ -220,7 +224,7 @@ void main() {
     await _wait(tester, 800);
     expect(scope.playlists.byId(made.id)!.paths, [first.path]);
 
-    await tester.tap(find.widgetWithText(SideItem, 'Halcyn test'));
+    await _side(tester, 'Halcyn test');
     await _wait(tester, 1000);
     expect(find.byType(TrackRow), findsOneWidget);
     await _shot('7-playlist');
@@ -237,7 +241,7 @@ void main() {
     Finder field(String hint) => find.byWidgetPredicate(
       (w) => w is TextField && w.decoration?.hintText == hint,
     );
-    await tester.tap(find.widgetWithText(SideItem, 'Songs'));
+    await _side(tester, 'Songs');
     await _wait(tester, 600);
     await tester.enterText(field('Search this page'), 'joji');
     await _wait(tester, 800);
@@ -266,7 +270,7 @@ void main() {
     await _shot('8c-search-everything');
     await tester.enterText(field('Search all'), '');
     await _wait(tester, 300);
-    await tester.tap(find.widgetWithText(SideItem, 'Songs'));
+    await _side(tester, 'Songs');
     await _wait(tester, 600);
 
     // A song with synced lyrics: the Lyrics button opens them, following along.
@@ -383,7 +387,7 @@ void main() {
     await _shot('10-full-again');
 
     // Sorting: a column title sorts the songs, again reverses them.
-    await tester.tap(find.widgetWithText(SideItem, 'Songs'));
+    await _side(tester, 'Songs');
     await _wait(tester, 800);
     List<String> artists() => [
       for (final row in tester.widgetList<TrackRow>(find.byType(TrackRow)))
@@ -472,6 +476,29 @@ Future<Map<String, dynamic>?> _client() async {
       .cast<Map<String, dynamic>>()
       .where((c) => c['pid'] == pid)
       .firstOrNull;
+}
+
+/// Taps a sidebar entry, scrolling the sidebar to it first: on a short window its
+/// list only builds what's near the screen.
+Future<void> _side(WidgetTester tester, String label) async {
+  final target = find.widgetWithText(SideItem, label);
+  final list = find.descendant(
+    of: find.descendant(
+      of: find.byType(Sidebar),
+      matching: find.byType(ListView),
+    ),
+    matching: find.byType(Scrollable),
+  );
+  // Up to the top first, then down.
+  for (final dy in [200.0, -200.0]) {
+    for (var i = 0; i < 15 && target.evaluate().isEmpty; i++) {
+      await tester.drag(list.first, Offset(0, dy));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+  await tester.ensureVisible(target);
+  await tester.pump(const Duration(milliseconds: 200));
+  await tester.tap(target);
 }
 
 /// Flutter's own frame, for when the test resizes the view without resizing the window.

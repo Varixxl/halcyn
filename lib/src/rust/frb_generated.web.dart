@@ -8,6 +8,7 @@
 
 import 'api/library.dart';
 import 'api/player.dart';
+import 'api/plugins.dart';
 import 'api/sound.dart';
 
 import 'dart:async';
@@ -35,6 +36,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<PlayerEvent> dco_decode_StreamSink_player_event_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<PluginRequest> dco_decode_StreamSink_plugin_request_Sse(
     dynamic raw,
   );
 
@@ -128,6 +134,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Playlist dco_decode_playlist(dynamic raw);
 
   @protected
+  PluginRequest dco_decode_plugin_request(dynamic raw);
+
+  @protected
   Repeat dco_decode_repeat(dynamic raw);
 
   @protected
@@ -167,6 +176,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<PlayerEvent> sse_decode_StreamSink_player_event_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<PluginRequest> sse_decode_StreamSink_plugin_request_Sse(
     SseDeserializer deserializer,
   );
 
@@ -262,6 +276,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Playlist sse_decode_playlist(SseDeserializer deserializer);
 
   @protected
+  PluginRequest sse_decode_plugin_request(SseDeserializer deserializer);
+
+  @protected
   Repeat sse_decode_repeat(SseDeserializer deserializer);
 
   @protected
@@ -306,6 +323,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_player_event_Sse(
     RustStreamSink<PlayerEvent> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_plugin_request_Sse(
+    RustStreamSink<PluginRequest> self,
     SseSerializer serializer,
   );
 
@@ -425,6 +448,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_playlist(Playlist self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_plugin_request(PluginRequest self, SseSerializer serializer);
 
   @protected
   void sse_encode_repeat(Repeat self, SseSerializer serializer);
