@@ -1,0 +1,58 @@
+{
+  "id": "washi-paper-ceremony",
+  "name": "Washi Paper Ceremony",
+  "description": "Textured cream mulberry paper, steeped green tea leaves and rich sumi calligraphy brushstrokes.",
+  "brightness": "light",
+  "colors": {
+    "background": "#F8F5EE",
+    "backgroundTop": "#FCFAF6",
+    "surface": "#FFFFFF",
+    "surfaceHigh": "#EDE8DB",
+    "outline": "#D4CCA5",
+    "text": "#1F1D17",
+    "textMuted": "#57534E",
+    "accent": "#15803D",
+    "accentLight": "#22C55E",
+    "accentDeep": "#14532D",
+    "onAccent": "#FFFFFF",
+    "warm": "#B45309"
+  },
+  "glows": [
+    {
+      "x": -0.9,
+      "y": -1.0,
+      "color": "#DCFCE7",
+      "alpha": 0.4,
+      "radius": 1.25
+    },
+    {
+      "x": 1.0,
+      "y": 0.8,
+      "color": "#FEF3C7",
+      "alpha": 0.35,
+      "radius": 1.2
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.7,
+    "veilBottom": 0.35,
+    "rim": 0.35,
+    "gloss": 0.2,
+    "blur": 22,
+    "dockTint": 0.14
+  },
+  "shape": {
+    "radius": 0.9
+  },
+  "cover": {
+    "blur": 64,
+    "opacity": 0.58,
+    "scrim": [
+      0.45,
+      0.72,
+      0.88
+    ]
+  },
+  "sheen": 0.15
+}

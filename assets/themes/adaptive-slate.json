@@ -1,0 +1,43 @@
+{
+  "id": "adaptive-slate",
+  "name": "Adaptive Slate",
+  "description": "Flat graphite slate with a clear blue accent and amber for the signal path. The default look.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#0D0F12",
+    "backgroundTop": "#0D0F12",
+    "surface": "#15181E",
+    "surfaceHigh": "#1E222A",
+    "outline": "#2C313C",
+    "text": "#F1F5F9",
+    "textMuted": "#94A3B8",
+    "accent": "#3B82F6",
+    "accentLight": "#60A5FA",
+    "accentDeep": "#2563EB",
+    "onAccent": "#FFFFFF",
+    "warm": "#EAB308"
+  },
+  "glows": [],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.035,
+    "veilBottom": 0.025,
+    "rim": 0.07,
+    "gloss": 0.0,
+    "blur": 0,
+    "dockTint": 0.9
+  },
+  "shape": {
+    "radius": 0.5
+  },
+  "cover": {
+    "blur": 48,
+    "opacity": 0.5,
+    "scrim": [
+      0.55,
+      0.78,
+      0.92
+    ]
+  },
+  "sheen": 0.0
+}

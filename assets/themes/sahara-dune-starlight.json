@@ -1,0 +1,65 @@
+{
+  "id": "sahara-dune-starlight",
+  "name": "Sahara Dune Starlight",
+  "description": "Sweeping terracotta sands resting under clear desert twilight and warm campfire radiance.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#160E0A",
+    "backgroundTop": "#0D1322",
+    "surface": "#1C1820",
+    "surfaceHigh": "#2B252E",
+    "outline": "#5E4539",
+    "text": "#FAF5F0",
+    "textMuted": "#C8ACA1",
+    "accent": "#C2410C",
+    "accentLight": "#FB923C",
+    "accentDeep": "#9A3412",
+    "onAccent": "#FFFFFF",
+    "warm": "#FBBF24"
+  },
+  "glows": [
+    {
+      "x": -1.0,
+      "y": -0.9,
+      "color": "#1E293B",
+      "alpha": 0.5,
+      "radius": 1.3
+    },
+    {
+      "x": 1.1,
+      "y": 1.0,
+      "color": "#9A3412",
+      "alpha": 0.55,
+      "radius": 1.2
+    },
+    {
+      "x": 0.7,
+      "y": -0.8,
+      "color": "#FBBF24",
+      "alpha": 0.1,
+      "radius": 0.75
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.1,
+    "veilBottom": 0.02,
+    "rim": 0.1,
+    "gloss": 0.15,
+    "blur": 22,
+    "dockTint": 0.56
+  },
+  "shape": {
+    "radius": 1.35
+  },
+  "cover": {
+    "blur": 70,
+    "opacity": 0.7,
+    "scrim": [
+      0.32,
+      0.65,
+      0.9
+    ]
+  },
+  "sheen": 0.14
+}

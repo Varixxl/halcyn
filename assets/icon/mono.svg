@@ -1,0 +1,7 @@
+<!-- One colour, for Android's notification and themed icons. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <clipPath id="sky"><rect x="0" y="0" width="1024" height="560"/></clipPath>
+  <circle cx="512" cy="560" r="236" fill="#fff" clip-path="url(#sky)"/>
+  <path d="M232 648 q70 -44 140 0 t140 0 t140 0 t140 0" fill="none" stroke="#fff" stroke-width="60" stroke-linecap="round"/>
+  <path d="M302 752 q52 -36 105 0 t105 0 t105 0 t105 0" fill="none" stroke="#fff" stroke-width="60" stroke-linecap="round"/>
+</svg>

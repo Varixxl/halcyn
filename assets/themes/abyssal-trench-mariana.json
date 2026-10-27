@@ -1,0 +1,65 @@
+{
+  "id": "abyssal-trench-mariana",
+  "name": "Abyssal Trench Mariana",
+  "description": "Midnight oceanic depth, cold hydrodynamic currents and glowing bioluminescent cyan.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#030F14",
+    "backgroundTop": "#061922",
+    "surface": "#0B2532",
+    "surfaceHigh": "#123446",
+    "outline": "#1D4E67",
+    "text": "#ECFEFF",
+    "textMuted": "#85B6C8",
+    "accent": "#0D9488",
+    "accentLight": "#2DD4BF",
+    "accentDeep": "#0F766E",
+    "onAccent": "#FFFFFF",
+    "warm": "#FBBF24"
+  },
+  "glows": [
+    {
+      "x": -0.7,
+      "y": -1.2,
+      "color": "#0F766E",
+      "alpha": 0.5,
+      "radius": 1.3
+    },
+    {
+      "x": 1.2,
+      "y": 0.8,
+      "color": "#115E59",
+      "alpha": 0.45,
+      "radius": 1.1
+    },
+    {
+      "x": -0.6,
+      "y": 1.0,
+      "color": "#06B6D4",
+      "alpha": 0.2,
+      "radius": 0.85
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.12,
+    "veilBottom": 0.02,
+    "rim": 0.12,
+    "gloss": 0.19,
+    "blur": 25,
+    "dockTint": 0.52
+  },
+  "shape": {
+    "radius": 1.15
+  },
+  "cover": {
+    "blur": 70,
+    "opacity": 0.74,
+    "scrim": [
+      0.26,
+      0.6,
+      0.88
+    ]
+  },
+  "sheen": 0.16
+}

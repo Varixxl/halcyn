@@ -1,0 +1,65 @@
+{
+  "id": "bourbon-ember-cellar",
+  "name": "Bourbon Ember Cellar",
+  "description": "Charred oak cask nuances, warm molasses undertones and polished brass warmth.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#140A04",
+    "backgroundTop": "#201107",
+    "surface": "#2E190B",
+    "surfaceHigh": "#3F2310",
+    "outline": "#5E371C",
+    "text": "#FEF3C7",
+    "textMuted": "#CDB397",
+    "accent": "#D97706",
+    "accentLight": "#FBBF24",
+    "accentDeep": "#B45309",
+    "onAccent": "#FFFFFF",
+    "warm": "#FDE047"
+  },
+  "glows": [
+    {
+      "x": -0.9,
+      "y": -1.0,
+      "color": "#9A3412",
+      "alpha": 0.52,
+      "radius": 1.25
+    },
+    {
+      "x": 1.0,
+      "y": 1.0,
+      "color": "#431407",
+      "alpha": 0.65,
+      "radius": 1.2
+    },
+    {
+      "x": -0.4,
+      "y": 0.5,
+      "color": "#FDE047",
+      "alpha": 0.08,
+      "radius": 0.7
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.11,
+    "veilBottom": 0.02,
+    "rim": 0.11,
+    "gloss": 0.17,
+    "blur": 22,
+    "dockTint": 0.55
+  },
+  "shape": {
+    "radius": 0.8
+  },
+  "cover": {
+    "blur": 68,
+    "opacity": 0.7,
+    "scrim": [
+      0.3,
+      0.65,
+      0.9
+    ]
+  },
+  "sheen": 0.14
+}

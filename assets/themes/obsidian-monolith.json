@@ -1,0 +1,58 @@
+{
+  "id": "obsidian-monolith",
+  "name": "Obsidian Monolith",
+  "description": "True pitch black OLED depth framed by cold titanium and vivid azure starlight.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#000000",
+    "backgroundTop": "#07080B",
+    "surface": "#0E1015",
+    "surfaceHigh": "#161922",
+    "outline": "#272B38",
+    "text": "#FFFFFF",
+    "textMuted": "#9CA3AF",
+    "accent": "#0284C7",
+    "accentLight": "#38BDF8",
+    "accentDeep": "#0369A1",
+    "onAccent": "#FFFFFF",
+    "warm": "#F59E0B"
+  },
+  "glows": [
+    {
+      "x": -0.9,
+      "y": -1.2,
+      "color": "#0284C7",
+      "alpha": 0.22,
+      "radius": 1.0
+    },
+    {
+      "x": 1.2,
+      "y": 1.0,
+      "color": "#1E293B",
+      "alpha": 0.35,
+      "radius": 1.1
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.08,
+    "veilBottom": 0.01,
+    "rim": 0.16,
+    "gloss": 0.24,
+    "blur": 28,
+    "dockTint": 0.8
+  },
+  "shape": {
+    "radius": 0.4
+  },
+  "cover": {
+    "blur": 64,
+    "opacity": 0.7,
+    "scrim": [
+      0.35,
+      0.75,
+      0.95
+    ]
+  },
+  "sheen": 0.2
+}

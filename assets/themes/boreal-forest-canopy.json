@@ -1,0 +1,65 @@
+{
+  "id": "boreal-forest-canopy",
+  "name": "Boreal Forest Canopy",
+  "description": "Deep pine and cedar shadows illuminated by jade glass and glowing amber embers.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#06140E",
+    "backgroundTop": "#0B2117",
+    "surface": "#112F21",
+    "surfaceHigh": "#183F2D",
+    "outline": "#275E44",
+    "text": "#ECFDF5",
+    "textMuted": "#86D3A9",
+    "accent": "#059669",
+    "accentLight": "#10B981",
+    "accentDeep": "#047857",
+    "onAccent": "#FFFFFF",
+    "warm": "#FBBF24"
+  },
+  "glows": [
+    {
+      "x": -1.0,
+      "y": -1.0,
+      "color": "#047857",
+      "alpha": 0.48,
+      "radius": 1.25
+    },
+    {
+      "x": 1.1,
+      "y": 0.8,
+      "color": "#064E3B",
+      "alpha": 0.55,
+      "radius": 1.2
+    },
+    {
+      "x": 0.8,
+      "y": -0.6,
+      "color": "#FBBF24",
+      "alpha": 0.06,
+      "radius": 0.7
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.1,
+    "veilBottom": 0.02,
+    "rim": 0.12,
+    "gloss": 0.16,
+    "blur": 24,
+    "dockTint": 0.55
+  },
+  "shape": {
+    "radius": 1.1
+  },
+  "cover": {
+    "blur": 70,
+    "opacity": 0.72,
+    "scrim": [
+      0.25,
+      0.62,
+      0.88
+    ]
+  },
+  "sheen": 0.16
+}

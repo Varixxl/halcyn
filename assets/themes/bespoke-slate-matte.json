@@ -1,0 +1,51 @@
+{
+  "id": "bespoke-slate-matte",
+  "name": "Bespoke Slate Matte",
+  "description": "Studio reference console aesthetic in low-reflectance slate, graphite and tactile cobalt.",
+  "brightness": "dark",
+  "colors": {
+    "background": "#12151A",
+    "backgroundTop": "#181C23",
+    "surface": "#1E232B",
+    "surfaceHigh": "#282E39",
+    "outline": "#3B4352",
+    "text": "#F1F5F9",
+    "textMuted": "#94A3B8",
+    "accent": "#2563EB",
+    "accentLight": "#3B82F6",
+    "accentDeep": "#1D4ED8",
+    "onAccent": "#FFFFFF",
+    "warm": "#F59E0B"
+  },
+  "glows": [
+    {
+      "x": 0.0,
+      "y": -1.3,
+      "color": "#1E293B",
+      "alpha": 0.25,
+      "radius": 1.4
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.03,
+    "veilBottom": 0.01,
+    "rim": 0.06,
+    "gloss": 0.0,
+    "blur": 4,
+    "dockTint": 0.7
+  },
+  "shape": {
+    "radius": 0.5
+  },
+  "cover": {
+    "blur": 48,
+    "opacity": 0.65,
+    "scrim": [
+      0.4,
+      0.7,
+      0.9
+    ]
+  },
+  "sheen": 0.0
+}

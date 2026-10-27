@@ -1,0 +1,58 @@
+{
+  "id": "nordic-amber-solstice",
+  "name": "Nordic Amber Solstice",
+  "description": "Pale scandinavian birch timbers under midsummer sunlight, paired with rich roasted espresso.",
+  "brightness": "light",
+  "colors": {
+    "background": "#FAF4E6",
+    "backgroundTop": "#FFFBF0",
+    "surface": "#FFFFFF",
+    "surfaceHigh": "#F3E7CE",
+    "outline": "#DACBB0",
+    "text": "#1C160C",
+    "textMuted": "#5C5242",
+    "accent": "#C2410C",
+    "accentLight": "#F97316",
+    "accentDeep": "#7C2D12",
+    "onAccent": "#FFFFFF",
+    "warm": "#854D0E"
+  },
+  "glows": [
+    {
+      "x": -0.9,
+      "y": -1.1,
+      "color": "#FED7AA",
+      "alpha": 0.45,
+      "radius": 1.35
+    },
+    {
+      "x": 1.0,
+      "y": 0.9,
+      "color": "#FEF08A",
+      "alpha": 0.3,
+      "radius": 1.1
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.72,
+    "veilBottom": 0.38,
+    "rim": 0.36,
+    "gloss": 0.25,
+    "blur": 22,
+    "dockTint": 0.12
+  },
+  "shape": {
+    "radius": 0.85
+  },
+  "cover": {
+    "blur": 62,
+    "opacity": 0.58,
+    "scrim": [
+      0.45,
+      0.72,
+      0.88
+    ]
+  },
+  "sheen": 0.18
+}

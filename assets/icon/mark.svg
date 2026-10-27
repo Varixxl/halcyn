@@ -1,0 +1,13 @@
+<!-- The mark alone (sun on a calm sea) on a transparent 1024 canvas, centred. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#93C5FD"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <clipPath id="sky"><rect x="0" y="0" width="1024" height="560"/></clipPath>
+  </defs>
+  <circle cx="512" cy="560" r="236" fill="url(#sun)" clip-path="url(#sky)"/>
+  <path d="M232 648 q70 -44 140 0 t140 0 t140 0 t140 0" fill="none" stroke="#60A5FA" stroke-width="52" stroke-linecap="round"/>
+  <path d="M302 752 q52 -36 105 0 t105 0 t105 0 t105 0" fill="none" stroke="#60A5FA" stroke-opacity="0.5" stroke-width="52" stroke-linecap="round"/>
+</svg>

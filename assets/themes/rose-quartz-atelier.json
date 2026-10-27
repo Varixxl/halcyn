@@ -1,0 +1,58 @@
+{
+  "id": "rose-quartz-atelier",
+  "name": "Rose Quartz Atelier",
+  "description": "Polished alabaster crystal facets, warm spun silk and concentrated crimson carmine accents.",
+  "brightness": "light",
+  "colors": {
+    "background": "#FDF5F6",
+    "backgroundTop": "#FFF9FA",
+    "surface": "#FFFFFF",
+    "surfaceHigh": "#F5E5E8",
+    "outline": "#E2C7CD",
+    "text": "#250C12",
+    "textMuted": "#5C474D",
+    "accent": "#BE123C",
+    "accentLight": "#F43F5E",
+    "accentDeep": "#881337",
+    "onAccent": "#FFFFFF",
+    "warm": "#9A3412"
+  },
+  "glows": [
+    {
+      "x": -0.8,
+      "y": -1.1,
+      "color": "#FFE4E6",
+      "alpha": 0.55,
+      "radius": 1.3
+    },
+    {
+      "x": 1.1,
+      "y": 0.9,
+      "color": "#FCE7F3",
+      "alpha": 0.4,
+      "radius": 1.15
+    }
+  ],
+  "glass": {
+    "veil": "#FFFFFF",
+    "veilTop": 0.78,
+    "veilBottom": 0.42,
+    "rim": 0.38,
+    "gloss": 0.32,
+    "blur": 26,
+    "dockTint": 0.1
+  },
+  "shape": {
+    "radius": 1.4
+  },
+  "cover": {
+    "blur": 65,
+    "opacity": 0.6,
+    "scrim": [
+      0.45,
+      0.72,
+      0.88
+    ]
+  },
+  "sheen": 0.22
+}
