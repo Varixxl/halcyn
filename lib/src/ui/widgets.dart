@@ -1,6 +1,8 @@
 import '../cast/receiver.dart';
 import '../cast/sender.dart';
+import '../state/fetcher.dart';
 import '../state/plugins.dart';
+import '../state/streaming.dart';
 import '../state/updater.dart';
 
 import 'dart:io';
@@ -36,6 +38,8 @@ class AppScope extends InheritedWidget {
     required this.receiver,
     required this.updater,
     required this.plugins,
+    required this.fetcher,
+    required this.streaming,
     required super.child,
   });
 
@@ -52,6 +56,8 @@ class AppScope extends InheritedWidget {
   final CastReceiver receiver;
   final Updater updater;
   final PluginManager plugins;
+  final Fetcher fetcher;
+  final StreamingController streaming;
 
   static AppScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!;
@@ -299,11 +305,19 @@ class QualityLabel extends StatelessWidget {
     final bits = track.bits;
     final khz = track.sampleRate / 1000;
     final rate = khz == khz.roundToDouble() ? '${khz.round()}' : '$khz';
-    final hiRes = (bits ?? 0) > 16 || track.sampleRate > 48000;
+    // A streamed song says the best its service has it in: Hi-res, Lossless or AAC.
+    final streamed = track.sampleRate == 0 && track.codec.isNotEmpty;
+    final hiRes = streamed
+        ? track.codec == 'Hi-res'
+        : (bits ?? 0) > 16 || track.sampleRate > 48000;
     return SizedBox(
       width: 64,
       child: Text(
-        bits == null ? rate : '$bits/$rate',
+        streamed
+            ? track.codec
+            : bits == null
+            ? rate
+            : '$bits/$rate',
         textAlign: TextAlign.right,
         maxLines: 1,
         softWrap: false,
@@ -556,22 +570,28 @@ class _SeekBarState extends State<SeekBar> {
                 ),
               );
               if (widget.compact) {
-                return Row(
-                  children: [
-                    SizedBox(
-                      width: 40,
-                      child: Text(clock(shown), style: style),
-                    ),
-                    Expanded(child: slider),
-                    SizedBox(
-                      width: 40,
-                      child: Text(
-                        clock(duration),
-                        style: style,
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
+                return LayoutBuilder(
+                  builder: (context, size) {
+                    // A narrow bar keeps the slider and drops the times.
+                    if (size.maxWidth < 160) return slider;
+                    return Row(
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          child: Text(clock(shown), style: style),
+                        ),
+                        Expanded(child: slider),
+                        SizedBox(
+                          width: 40,
+                          child: Text(
+                            clock(duration),
+                            style: style,
+                            textAlign: TextAlign.right,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               }
               return Column(
@@ -696,4 +716,10 @@ String longDuration(double secs) {
   return minutes >= 60
       ? '${minutes ~/ 60} h ${minutes % 60} min'
       : '$minutes min';
+}
+
+/// The device being cast to, while casting: its signal path is what this one shows.
+String? castTarget(BuildContext context) {
+  final scope = AppScope.of(context);
+  return scope.player.casting ? scope.cast.device?.name : null;
 }

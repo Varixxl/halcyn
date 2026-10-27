@@ -22,7 +22,14 @@ class PlaylistsController extends ChangeNotifier {
   }
 
   void rename(Playlist playlist, String name) {
-    _replace(Playlist(id: playlist.id, name: name, paths: playlist.paths));
+    _replace(
+      Playlist(
+        id: playlist.id,
+        name: name,
+        paths: playlist.paths,
+        source: playlist.source,
+      ),
+    );
     libraryRenamePlaylist(id: playlist.id, name: name);
   }
 
@@ -49,7 +56,14 @@ class PlaylistsController extends ChangeNotifier {
   }
 
   void _setPaths(Playlist playlist, List<String> paths) {
-    _replace(Playlist(id: playlist.id, name: playlist.name, paths: paths));
+    _replace(
+      Playlist(
+        id: playlist.id,
+        name: playlist.name,
+        paths: paths,
+        source: playlist.source,
+      ),
+    );
     librarySetPlaylistTracks(id: playlist.id, paths: paths);
   }
 

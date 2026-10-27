@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'src/rust/api/library.dart';
+import 'src/rust/api/streaming.dart';
 import 'src/rust/frb_generated.dart';
 import 'src/cast/receiver.dart';
 import 'src/cast/sender.dart';
@@ -16,7 +18,9 @@ import 'src/state/playlists.dart';
 import 'src/state/sort.dart';
 import 'src/state/sound.dart';
 import 'src/state/themes.dart';
+import 'src/state/fetcher.dart';
 import 'src/state/plugins.dart';
+import 'src/state/streaming.dart';
 import 'src/state/updater.dart';
 import 'src/theme.dart';
 import 'src/ui/plugins_page.dart';
@@ -35,6 +39,23 @@ Future<void> main(List<String> args) async {
   logErrorsTo(File('${data.path}/halcyn.log'));
   final cache = await getApplicationCacheDirectory();
   await libraryOpen(dataDir: data.path, cacheDir: cache.path);
+  await streamingInit(dataDir: data.path, cacheDir: cache.path);
+  if (Platform.isAndroid) {
+    // YouTube's audio addresses come from NewPipe's extractor, in the app.
+    const android = MethodChannel('halcyn/android');
+    await streamingSetYoutubeResolver(
+      resolve: (id) async {
+        try {
+          return await android.invokeMethod<String>('youtubeAudio', {
+                'id': id,
+              }) ??
+              '';
+        } on PlatformException catch (e) {
+          return e.message ?? '';
+        }
+      },
+    );
+  }
 
   // Audio sent to a test sink (see integration_test/) isn't listening: it doesn't
   // count towards Most played, replace the session to resume or save settings.
@@ -45,15 +66,28 @@ Future<void> main(List<String> args) async {
   );
   await themes.load();
   final library = LibraryController();
-  final playlists = PlaylistsController();
   final sound = SoundController(
     File('${data.path}/sound.json'),
     persist: listening,
   );
   final sort = SortPrefs(File('${data.path}/sort.json'), persist: listening);
+  late final StreamingController streaming;
   final player = PlayerController(
     session: listening ? File('${data.path}/session.json') : null,
-    onListened: listening ? library.recordPlay : null,
+    onListened: listening
+        ? (track) {
+            library.recordPlay(track);
+            streaming.listened(track);
+          }
+        : null,
+  );
+  final playlists = PlaylistsController();
+  streaming = StreamingController(
+    library: library,
+    player: player,
+    playlists: playlists,
+    settings: File('${data.path}/streaming.json'),
+    persist: listening,
   );
   // Show what's already indexed right away, then pick up changes in the background.
   await Future.wait([
@@ -62,6 +96,8 @@ Future<void> main(List<String> args) async {
     sound.load(),
     sort.load(),
   ]);
+  // Before the session comes back: it may hold streamed songs.
+  await streaming.load();
   if (args.isEmpty) await player.restore(library.byPath);
   final access = MusicAccess(library);
   final artDir = libraryArtDir();
@@ -115,9 +151,21 @@ Future<void> main(List<String> args) async {
     appVersion: version,
   );
   await plugins.load();
+  downloadedLyricsDir = Directory('${data.path}/lyrics');
+  final fetcher = Fetcher(
+    library: library,
+    player: player,
+    settings: File('${data.path}/fetch.json'),
+    userAgent: 'Halcyn/$version ( https://github.com/Varixxl/halcyn )',
+    // Tests don't download.
+    online: listening,
+    persist: listening,
+  );
+  await fetcher.load();
+  fetcher.start();
   await Future.wait([
     access.start(),
-    MediaSession.start(player, library, artDir),
+    MediaSession.start(player, library, artDir, cast),
   ]);
   if (access.granted) {
     library.rescan().then((_) => _playArgument(args, library, player));
@@ -138,6 +186,8 @@ Future<void> main(List<String> args) async {
       receiver: receiver,
       updater: updater,
       plugins: plugins,
+      fetcher: fetcher,
+      streaming: streaming,
       child: const HalcynApp(),
     ),
   );

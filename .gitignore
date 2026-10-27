@@ -49,3 +49,6 @@ app.*.map.json
 
 # Notes shared between the AI assistants working on this repo; kept local.
 /.ai-memory/
+
+# Tidal's app keys, written by tools/tidal-keys.sh (from the tidalapi package). Never commit.
+/tidal.properties

@@ -16,7 +16,8 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 /** audio_service's activity (it shares the engine with the media service), plus the
- *  `halcyn/android` channel for reading the music folder and showing notifications. */
+ *  `halcyn/android` channel for reading the music folder, showing notifications and finding
+ *  YouTube Music's audio. */
 class MainActivity : AudioServiceActivity() {
     companion object {
         init {
@@ -57,6 +58,22 @@ class MainActivity : AudioServiceActivity() {
                         Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
                             ?: Build.MODEL
                     )
+                    // The cookies of a sign-in page (YouTube Music's), for the core.
+                    "cookies" -> result.success(
+                        android.webkit.CookieManager.getInstance().getCookie(call.argument<String>("url"))
+                    )
+                    "youtubeAudio" -> {
+                        val id = call.argument<String>("id")!!
+                        Thread {
+                            val found = runCatching { YouTubeAudio.find(id) }
+                            runOnUiThread {
+                                found.fold(
+                                    { result.success(it) },
+                                    { result.error("youtube", it.message ?: "YouTube wouldn't send the audio", null) },
+                                )
+                            }
+                        }.start()
+                    }
                     "askToReadMusic" -> {
                         askToReadMusic()
                         result.success(null)

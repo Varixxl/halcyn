@@ -52,7 +52,25 @@ void main() {
     );
     final discover = File('plugins/examples/discover.js').readAsStringSync();
     expect(await tester.runAsync(() => plugins.install(discover)), isNull);
-    await _wait(tester, 600);
+    // The wordmark flashes a rainbow, then settles.
+    expect(plugins.loaded.value, greaterThan(0));
+    await _wait(tester, 500);
+    expect(
+      find.descendant(
+        of: find.byType(Wordmark),
+        matching: find.byType(ShaderMask),
+      ),
+      findsOneWidget,
+    );
+    await _shot(tester, 'plugins-0-rainbow');
+    await _wait(tester, 1600);
+    expect(
+      find.descendant(
+        of: find.byType(Wordmark),
+        matching: find.byType(ShaderMask),
+      ),
+      findsNothing,
+    );
 
     // Its page is in the sidebar and renders the blocks render() returns.
     await _until(tester, () => plugins.tabs(TabPlace.sidebar).isNotEmpty);
@@ -175,7 +193,7 @@ halcyn.ui.replace('albums', { title: 'Records', render: () => [
   ] },
   { type: 'switch', label: 'A switch', value: pressed > 0, onChange: () => {} },
 ] });
-halcyn.ui.addTab({ title: 'Home', icon: 'home', where: 'main',
+halcyn.ui.addTab({ title: 'Welcome', icon: 'home', where: 'main',
   render: () => [{ type: 'text', text: 'Welcome home' }] });
 halcyn.ui.addTab({ title: 'Extras', where: 'library',
   render: () => [{ type: 'text', text: 'Library extras' }] });
@@ -198,8 +216,8 @@ halcyn.hooks.beforePlay(({ tracks, start }) => {
     expect(scope.themes.themes.map((t) => t.name), contains('Plugin theme'));
 
     // The main tab is at the top of the sidebar.
-    await _sidebar(tester, 'Home', up: true);
-    await tester.tap(find.text('Home'));
+    await _sidebar(tester, 'Welcome', up: true);
+    await tester.tap(find.text('Welcome'));
     await _until(tester, () => find.text('Welcome home').evaluate().isNotEmpty);
 
     // Albums shows the plugin's page instead, and a press renders it again.

@@ -4,7 +4,7 @@
 mod convert;
 pub mod dsp;
 mod output;
-mod source;
+pub(crate) mod source;
 mod spectrum;
 
 use std::path::{Path, PathBuf};
@@ -479,7 +479,8 @@ impl Runner {
 }
 
 fn track_info(path: &Path, info: &SourceInfo) -> TrackInfo {
-    let tagged = lofty::read_from_path(path).ok();
+    // A streamed song's details are the app's; it has no tags to read here.
+    let tagged = (!crate::streaming::is_stream(path)).then(|| lofty::read_from_path(path).ok()).flatten();
     let tag = tagged.as_ref().and_then(|t| t.primary_tag().or_else(|| t.first_tag()));
     let text = |value: Option<std::borrow::Cow<'_, str>>| value.map(|v| v.into_owned());
     TrackInfo {

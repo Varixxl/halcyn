@@ -10,6 +10,7 @@ import 'api/library.dart';
 import 'api/player.dart';
 import 'api/plugins.dart';
 import 'api/sound.dart';
+import 'api/streaming.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -28,6 +29,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
+
+  @protected
+  FutureOr<String> Function(String)
+  dco_decode_DartFn_Inputs_String_Output_String_AnyhowException(dynamic raw);
+
+  @protected
+  Object dco_decode_DartOpaque(dynamic raw);
 
   @protected
   RustStreamSink<Float32List> dco_decode_StreamSink_list_prim_f_32_strict_Sse(
@@ -92,6 +100,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_isize(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -110,7 +121,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
 
   @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<RemotePlaylist> dco_decode_list_remote_playlist(dynamic raw);
+
+  @protected
+  List<RemoteShelf> dco_decode_list_remote_shelf(dynamic raw);
+
+  @protected
+  List<RemoteTrack> dco_decode_list_remote_track(dynamic raw);
 
   @protected
   List<Track> dco_decode_list_track(dynamic raw);
@@ -137,6 +160,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PluginRequest dco_decode_plugin_request(dynamic raw);
 
   @protected
+  RemotePlaylist dco_decode_remote_playlist(dynamic raw);
+
+  @protected
+  RemoteShelf dco_decode_remote_shelf(dynamic raw);
+
+  @protected
+  RemoteTrack dco_decode_remote_track(dynamic raw);
+
+  @protected
   Repeat dco_decode_repeat(dynamic raw);
 
   @protected
@@ -150,6 +182,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SoundSettings dco_decode_sound_settings(dynamic raw);
+
+  @protected
+  StreamingAccounts dco_decode_streaming_accounts(dynamic raw);
 
   @protected
   Track dco_decode_track(dynamic raw);
@@ -167,7 +202,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  BigInt dco_decode_usize(dynamic raw);
+
+  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+
+  @protected
+  Object sse_decode_DartOpaque(SseDeserializer deserializer);
 
   @protected
   RustStreamSink<Float32List> sse_decode_StreamSink_list_prim_f_32_strict_Sse(
@@ -234,6 +275,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_isize(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -252,7 +296,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
 
   @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<RemotePlaylist> sse_decode_list_remote_playlist(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<RemoteShelf> sse_decode_list_remote_shelf(SseDeserializer deserializer);
+
+  @protected
+  List<RemoteTrack> sse_decode_list_remote_track(SseDeserializer deserializer);
 
   @protected
   List<Track> sse_decode_list_track(SseDeserializer deserializer);
@@ -279,6 +337,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PluginRequest sse_decode_plugin_request(SseDeserializer deserializer);
 
   @protected
+  RemotePlaylist sse_decode_remote_playlist(SseDeserializer deserializer);
+
+  @protected
+  RemoteShelf sse_decode_remote_shelf(SseDeserializer deserializer);
+
+  @protected
+  RemoteTrack sse_decode_remote_track(SseDeserializer deserializer);
+
+  @protected
   Repeat sse_decode_repeat(SseDeserializer deserializer);
 
   @protected
@@ -292,6 +359,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SoundSettings sse_decode_sound_settings(SseDeserializer deserializer);
+
+  @protected
+  StreamingAccounts sse_decode_streaming_accounts(SseDeserializer deserializer);
 
   @protected
   Track sse_decode_track(SseDeserializer deserializer);
@@ -309,10 +379,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
+  BigInt sse_decode_usize(SseDeserializer deserializer);
+
+  @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_DartFn_Inputs_String_Output_String_AnyhowException(
+    FutureOr<String> Function(String) self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_DartOpaque(Object self, SseSerializer serializer);
 
   @protected
   void sse_encode_StreamSink_list_prim_f_32_strict_Sse(
@@ -393,6 +475,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_isize(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -420,8 +505,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_remote_playlist(
+    List<RemotePlaylist> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_remote_shelf(
+    List<RemoteShelf> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_remote_track(
+    List<RemoteTrack> self,
     SseSerializer serializer,
   );
 
@@ -453,6 +559,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_plugin_request(PluginRequest self, SseSerializer serializer);
 
   @protected
+  void sse_encode_remote_playlist(
+    RemotePlaylist self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_remote_shelf(RemoteShelf self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_remote_track(RemoteTrack self, SseSerializer serializer);
+
+  @protected
   void sse_encode_repeat(Repeat self, SseSerializer serializer);
 
   @protected
@@ -468,6 +586,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_sound_settings(SoundSettings self, SseSerializer serializer);
 
   @protected
+  void sse_encode_streaming_accounts(
+    StreamingAccounts self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_track(Track self, SseSerializer serializer);
 
   @protected
@@ -481,6 +605,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_usize(BigInt self, SseSerializer serializer);
 }
 
 // Section: wire_class

@@ -33,6 +33,15 @@ Stream<ScanProgress> libraryScan() =>
 Future<List<Track>> libraryTracks() =>
     RustLib.instance.api.crateApiLibraryLibraryTracks();
 
+/// Stores a downloaded cover for an album's tracks; returns its art key.
+Future<String?> libraryStoreFetchedArt({
+  required List<String> paths,
+  required List<int> image,
+}) => RustLib.instance.api.crateApiLibraryLibraryStoreFetchedArt(
+  paths: paths,
+  image: image,
+);
+
 /// Counts one listen of `path`, for Most played.
 Future<void> libraryRecordPlay({required String path}) =>
     RustLib.instance.api.crateApiLibraryLibraryRecordPlay(path: path);
@@ -85,10 +94,19 @@ class Playlist {
   /// The tracks in order. Paths that are no longer in the library are kept.
   final List<String> paths;
 
-  const Playlist({required this.id, required this.name, required this.paths});
+  /// The playlist file in the music folders it was read from, if it was.
+  final String? source;
+
+  const Playlist({
+    required this.id,
+    required this.name,
+    required this.paths,
+    this.source,
+  });
 
   @override
-  int get hashCode => id.hashCode ^ name.hashCode ^ paths.hashCode;
+  int get hashCode =>
+      id.hashCode ^ name.hashCode ^ paths.hashCode ^ source.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -97,7 +115,8 @@ class Playlist {
           runtimeType == other.runtimeType &&
           id == other.id &&
           name == other.name &&
-          paths == other.paths;
+          paths == other.paths &&
+          source == other.source;
 }
 
 class ScanProgress {

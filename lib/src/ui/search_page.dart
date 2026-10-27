@@ -5,6 +5,7 @@ import 'albums_page.dart';
 import 'artists_page.dart';
 import 'places.dart';
 import 'slate.dart';
+import 'streaming.dart';
 import 'track_list.dart';
 import 'widgets.dart';
 
@@ -36,13 +37,21 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([scope.library, scope.playlists]),
+      listenable: Listenable.merge([
+        scope.library,
+        scope.playlists,
+        scope.streaming,
+      ]),
       builder: (context, _) {
         final q = widget.query.toLowerCase();
+        final linked = scope.streaming.linked;
         if (q.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: Icons.search_rounded,
-            message: 'Search your songs, albums, artists and playlists.',
+            message: linked
+                ? 'Search your songs, albums, artists and playlists, and your '
+                      'streaming services.'
+                : 'Search your songs, albums, artists and playlists.',
           );
         }
         final library = scope.library;
@@ -64,7 +73,8 @@ class _SearchPageState extends State<SearchPage> {
           for (final p in scope.playlists.playlists)
             if (p.name.toLowerCase().contains(q)) p,
         ];
-        if (songs.isEmpty &&
+        if (!linked &&
+            songs.isEmpty &&
             albums.isEmpty &&
             artists.isEmpty &&
             playlists.isEmpty) {
@@ -138,6 +148,8 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                 ],
+                if (linked)
+                  SliverToBoxAdapter(child: RemoteResults(query: widget.query)),
                 SliverPadding(
                   padding: EdgeInsets.only(bottom: 24 + dockInset(context)),
                 ),

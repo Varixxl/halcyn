@@ -481,7 +481,6 @@ class _Block extends StatelessWidget {
           ],
         );
       case 'tracks':
-        final byPath = {for (final t in scope.library.tracks) t.path: t};
         final wanted = [
           for (final item in (block['paths'] ?? block['tracks']) as List? ?? [])
             switch (item) {
@@ -490,7 +489,10 @@ class _Block extends StatelessWidget {
               _ => null,
             },
         ];
-        final tracks = <Track>[for (final p in wanted) ?byPath[p]];
+        final tracks = <Track>[
+          for (final p in wanted)
+            if (p != null) ?scope.library.byPath(p),
+        ];
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [

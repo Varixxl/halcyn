@@ -199,7 +199,12 @@ class _Actions extends StatelessWidget {
             tooltip: window.pinned ? 'Unpin' : 'Pin on top',
           ),
           Expanded(
-            child: Center(child: SignalBadge(path: scope.player.signalPath)),
+            child: Center(
+              child: SignalBadge(
+                path: scope.player.signalPath,
+                castTo: castTarget(context),
+              ),
+            ),
           ),
           IconButton(
             onPressed: () => window.setMini(false),

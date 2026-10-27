@@ -47,17 +47,7 @@ class Sidebar extends StatelessWidget {
           Row(
             children: [
               const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'halcyn',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: Palette.accentLight,
-                  ),
-                ),
-              ),
+              const Expanded(child: Wordmark()),
               if (WindowController.supported) const MiniModeButton(),
               IconButton(
                 onPressed: () => onSelect(const Section(Place.settings)),
@@ -79,6 +69,7 @@ class Sidebar extends StatelessWidget {
                 scope.playlists,
                 scope.player,
                 scope.plugins,
+                scope.streaming,
               ]),
               builder: (context, _) {
                 final plugins = scope.plugins;
@@ -117,6 +108,8 @@ class Sidebar extends StatelessWidget {
                 ];
                 return ListView(
                   children: [
+                    if (scope.streaming.linked)
+                      _item(Place.home, 'Home', Icons.home_outlined),
                     for (final t in plugins.tabs(TabPlace.main)) _tab(t),
                     if (library.isNotEmpty) ...[
                       const SectionLabel('Library'),
@@ -147,7 +140,10 @@ class Sidebar extends StatelessWidget {
                       for (final p in scope.playlists.playlists)
                         SideItem(
                           label: p.name,
-                          icon: Icons.playlist_play_rounded,
+                          // Read from a playlist file in the music folders.
+                          icon: p.source == null
+                              ? Icons.playlist_play_rounded
+                              : Icons.description_outlined,
                           count: p.paths.length,
                           selected: section == Section(Place.playlist, p.id),
                           onTap: () => onSelect(Section(Place.playlist, p.id)),
@@ -204,6 +200,109 @@ class Sidebar extends StatelessWidget {
     final playlist = await playlists.create(name);
     onSelect(Section(Place.playlist, playlist.id));
   }
+}
+
+/// "halcyn" at the top of the sidebar. A rainbow sweeps through it when plugins load.
+class Wordmark extends StatefulWidget {
+  const Wordmark({super.key});
+
+  @override
+  State<Wordmark> createState() => _WordmarkState();
+}
+
+class _WordmarkState extends State<Wordmark>
+    with SingleTickerProviderStateMixin {
+  /// The last load flashed, across rebuilds of the sidebar (resizing to a phone and
+  /// back shouldn't flash again).
+  static int _shown = 0;
+
+  late final _flash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+  ValueNotifier<int>? _loaded;
+
+  static const _rainbow = [
+    Color(0xFFFF5F6D),
+    Color(0xFFFFB347),
+    Color(0xFFFFF275),
+    Color(0xFF7CF29C),
+    Color(0xFF5CC8FF),
+    Color(0xFF9D7BFF),
+    Color(0xFFFF6FD8),
+  ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final loaded = AppScope.of(context).plugins.loaded;
+    if (loaded != _loaded) {
+      _loaded?.removeListener(_check);
+      _loaded = loaded..addListener(_check);
+      // Plugins loaded before the sidebar was built (at startup).
+      WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+    }
+  }
+
+  void _check() {
+    final loaded = _loaded!.value;
+    if (!mounted || loaded <= _shown) return;
+    _shown = loaded;
+    if (MediaQuery.of(context).disableAnimations) return;
+    _flash.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _loaded?.removeListener(_check);
+    _flash.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(
+      'halcyn',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: Palette.accentLight,
+      ),
+    );
+    return AnimatedBuilder(
+      animation: _flash,
+      child: text,
+      builder: (context, child) {
+        final t = _flash.value;
+        if (t == 0 || t == 1) return child!;
+        // The rainbow slides across twice, then fades back into the accent.
+        final fade = t < 0.75 ? 1.0 : (1 - t) / 0.25;
+        return ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => LinearGradient(
+            colors: [
+              for (final c in [..._rainbow, ..._rainbow, _rainbow.first])
+                Color.lerp(Palette.accentLight, c, fade)!,
+            ],
+            tileMode: TileMode.repeated,
+            transform: _Slide(Curves.easeInOut.transform(t) * 2),
+          ).createShader(Rect.fromLTWH(0, 0, bounds.width * 2, bounds.height)),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+/// Moves a gradient along by `turns` of its width.
+class _Slide extends GradientTransform {
+  const _Slide(this.turns);
+  final double turns;
+
+  @override
+  Matrix4 transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(-bounds.width * turns, 0, 0);
 }
 
 /// The cover, title and signal of what's playing, floating at the bottom right of the

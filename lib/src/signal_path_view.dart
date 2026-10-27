@@ -5,9 +5,20 @@ import 'theme.dart';
 
 /// Shows what happens to the audio on its way out: file → Halcyn → output.
 class SignalPathView extends StatelessWidget {
-  const SignalPathView({super.key, required this.path});
+  const SignalPathView({
+    super.key,
+    required this.path,
+    this.castTo,
+    this.origin,
+  });
 
   final SignalPath path;
+
+  /// The service a streamed song comes from ("Tidal").
+  final String? origin;
+
+  /// While casting, the device playing: the path is that device's, not this one's.
+  final String? castTo;
 
   @override
   Widget build(BuildContext context) {
@@ -27,17 +38,27 @@ class SignalPathView extends StatelessWidget {
               children: [
                 Text('Signal path', style: theme.textTheme.titleSmall),
                 const Spacer(),
-                SignalBadge(path: path),
+                SignalBadge(path: path, castTo: castTo),
               ],
             ),
             const SizedBox(height: 12),
-            _Stage(icon: Icons.audio_file_outlined, text: path.source),
+            _Stage(
+              icon: origin == null
+                  ? Icons.audio_file_outlined
+                  : Icons.cloud_outlined,
+              text: origin == null ? path.source : '$origin · ${path.source}',
+            ),
             _Stage(
               icon: Icons.tune_rounded,
               text: path.processing,
               color: accent,
             ),
-            _Stage(icon: Icons.speaker_outlined, text: path.output),
+            _Stage(
+              icon: castTo == null
+                  ? Icons.speaker_outlined
+                  : Icons.cast_rounded,
+              text: outputLine(path, castTo),
+            ),
             if (path.warning case final warning?) ...[
               const SizedBox(height: 8),
               Text(
@@ -52,6 +73,10 @@ class SignalPathView extends StatelessWidget {
   }
 }
 
+/// Where the audio comes out, said as the other device's while casting.
+String outputLine(SignalPath path, String? castTo) =>
+    castTo == null ? path.output : 'On $castTo · ${path.output}';
+
 /// One word for what happens to the audio: Bit-exact, Resampled, EQ or Volume.
 String signalLabel(SignalPath path) => path.bitExact
     ? 'Bit-exact'
@@ -63,9 +88,12 @@ String signalLabel(SignalPath path) => path.bitExact
 
 /// "Bit-exact" or "Resampled", as a small pill.
 class SignalBadge extends StatelessWidget {
-  const SignalBadge({super.key, required this.path});
+  const SignalBadge({super.key, required this.path, this.castTo});
 
   final SignalPath? path;
+
+  /// See [SignalPathView.castTo].
+  final String? castTo;
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +104,8 @@ class SignalBadge extends StatelessWidget {
           ? const SizedBox.shrink()
           : Tooltip(
               key: ValueKey(path.bitExact),
-              message: '${path.source}\n${path.processing}\n${path.output}',
+              message:
+                  '${path.source}\n${path.processing}\n${outputLine(path, castTo)}',
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,

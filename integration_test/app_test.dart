@@ -47,6 +47,12 @@ void main() {
     );
 
     await app.main(const []);
+    // The desktop layout, whatever size the test window opened at (it may share the
+    // screen with other windows).
+    const desktop = Size(1440, 900);
+    // (Kept to the end: going back to the window's size mid-teardown, with Now Playing
+    // open, would overflow it.)
+    tester.view.physicalSize = desktop * tester.view.devicePixelRatio;
     await _wait(tester, 2500);
     expect(find.byType(TrackRow), findsWidgets);
     final scope = tester.widget<AppScope>(find.byType(AppScope));
@@ -158,7 +164,7 @@ void main() {
       await tester.tap(queuePill.hitTestable().first);
       await _wait(tester, 900);
     }
-    tester.view.resetPhysicalSize();
+    tester.view.physicalSize = desktop * tester.view.devicePixelRatio;
     await _wait(tester, 900);
 
     // Next track.
@@ -420,6 +426,26 @@ void main() {
     await _shot('12-settings-other-theme');
     await themes.select(original);
     await _wait(tester, 400);
+
+    // Settings → Streaming: both services, each with a way to sign in (or out). Without
+    // one linked there's no Home.
+    await tester.scrollUntilVisible(
+      find.text('YouTube Music'),
+      300,
+      scrollable: find
+          .ancestor(
+            of: find.text('Music folders'),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await _wait(tester, 400);
+    expect(find.text('Streaming'), findsOneWidget);
+    expect(find.text('Tidal'), findsOneWidget);
+    final streaming = scope.streaming;
+    expect(find.text(streaming.youtube ? 'Sign out' : 'Sign in'), findsWidgets);
+    expect(find.text('Home'), streaming.linked ? findsWidgets : findsNothing);
+    await _shot('11b-streaming-settings');
 
     // Sound: a headphone correction and bass turn the EQ on and show in the signal path;
     // volume does too. (Nothing is saved while testing.)

@@ -5,6 +5,7 @@ import '../theme.dart';
 import 'cast.dart';
 import 'plugin_view.dart';
 import 'plugins_page.dart';
+import 'streaming.dart';
 import 'theme_picker.dart';
 import 'updates.dart';
 import 'widgets.dart';
@@ -124,6 +125,8 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
             ),
+            const StreamingSettings(),
+            const _DownloadSettings(),
             const CastSettings(),
             // Plugins' own settings.
             for (final section in plugins.settingsSections) ...[
@@ -166,6 +169,62 @@ class SettingsPage extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Downloading covers and lyrics the library is missing (see `Fetcher`).
+class _DownloadSettings extends StatelessWidget {
+  const _DownloadSettings();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fetcher = AppScope.of(context).fetcher;
+    return ListenableBuilder(
+      listenable: fetcher,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+            child: Text(
+              'Cover art and lyrics',
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            title: const Text('Download missing cover art'),
+            subtitle: const Text(
+              'For albums without a cover, from MusicBrainz and the Cover Art '
+              'Archive',
+            ),
+            value: fetcher.art,
+            onChanged: fetcher.setArt,
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            title: const Text('Download missing lyrics'),
+            subtitle: const Text(
+              'For songs without a .lrc file, from LRCLIB. Kept in Halcyn\'s own '
+              'folder, not beside your music',
+            ),
+            value: fetcher.lyrics,
+            onChanged: fetcher.setLyrics,
+          ),
+          if (fetcher.status case final status?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+              child: Text(
+                status,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Palette.textMuted,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -8,7 +8,7 @@ use symphonia::core::codecs::audio::{AudioDecoder, AudioDecoderOptions};
 use symphonia::core::errors::Error as SymphoniaError;
 use symphonia::core::formats::probe::Hint;
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekMode, SeekTo, TrackType};
-use symphonia::core::io::MediaSourceStream;
+use symphonia::core::io::{MediaSource, MediaSourceStream};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::{Time, TimeBase, Timestamp};
 
@@ -42,12 +42,18 @@ pub struct Source {
 
 impl Source {
     pub fn open(path: &Path) -> Result<Self> {
-        let file = File::open(path).with_context(|| format!("can't open {}", path.display()))?;
-        let stream = MediaSourceStream::new(Box::new(file), Default::default());
         let mut hint = Hint::new();
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        let media: Box<dyn MediaSource> = if crate::streaming::is_stream(path) {
+            let (media, ext) = crate::streaming::open(&path.to_string_lossy())?;
             hint.with_extension(ext);
-        }
+            media
+        } else {
+            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                hint.with_extension(ext);
+            }
+            Box::new(File::open(path).with_context(|| format!("can't open {}", path.display()))?)
+        };
+        let stream = MediaSourceStream::new(media, Default::default());
         let format = symphonia::default::get_probe()
             .probe(&hint, stream, FormatOptions::default(), MetadataOptions::default())
             .context("unsupported or damaged file")?;
@@ -61,7 +67,9 @@ impl Source {
             .and_then(|p| p.audio())
             .ok_or_else(|| anyhow!("the audio track has no codec parameters"))?
             .clone();
-        let (track_id, time_base, total_frames) = (track.id, track.time_base, track.num_frames);
+        // A fragmented MP4 (a DASH stream) can say 0.
+        let (track_id, time_base, total_frames) =
+            (track.id, track.time_base, track.num_frames.filter(|n| *n > 0));
 
         let decoder = symphonia::default::get_codecs()
             .make_audio_decoder(&params, &AudioDecoderOptions::default())
@@ -89,9 +97,12 @@ impl Source {
     /// the stream. Damaged packets are skipped.
     pub fn read(&mut self, out: Samples<'_>) -> Result<bool> {
         loop {
-            let packet = match self.format.next_packet()? {
-                Some(packet) => packet,
-                None => return Ok(false),
+            let packet = match self.format.next_packet() {
+                Ok(Some(packet)) => packet,
+                Ok(None) => return Ok(false),
+                // How a stream whose length wasn't known yet ends.
+                Err(SymphoniaError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+                Err(e) => return Err(e.into()),
             };
             if packet.track_id != self.track_id {
                 continue;

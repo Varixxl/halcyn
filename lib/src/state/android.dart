@@ -6,6 +6,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../cast/sender.dart';
 import 'library.dart';
 import 'player.dart';
 
@@ -63,9 +64,10 @@ class MusicAccess extends ChangeNotifier with WidgetsBindingObserver {
 /// Android: the notification and lock-screen controls, headset buttons, and pausing when
 /// headphones are unplugged or a call comes in. Mirrors [PlayerController].
 class MediaSession extends BaseAudioHandler with SeekHandler {
-  MediaSession._(this._player, this._library, this._artDir) {
+  MediaSession._(this._player, this._library, this._artDir, this._cast) {
     _player.addListener(_sync);
     _player.position.addListener(_onPosition);
+    _cast.addListener(_syncVolume);
     _sync();
   }
 
@@ -74,10 +76,11 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
     PlayerController player,
     LibraryController library,
     String artDir,
+    CastController cast,
   ) async {
     if (!Platform.isAndroid) return;
     await AudioService.init(
-      builder: () => MediaSession._(player, library, artDir),
+      builder: () => MediaSession._(player, library, artDir, cast),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'io.github.varixxl.halcyn.playback',
         androidNotificationChannelName: 'Playback',
@@ -110,6 +113,12 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   final PlayerController _player;
   final LibraryController _library;
   final String _artDir;
+  final CastController _cast;
+
+  /// Volume key presses from silent to full on the other device.
+  static const _volumeSteps = 20;
+  bool _remoteVolume = false;
+  int? _shownVolume;
   String? _shown;
   double _syncedAt = 0;
   DateTime _syncedTime = DateTime.now();
@@ -133,7 +142,43 @@ class MediaSession extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> stop() async => _player.pause();
 
+  @override
+  Future<void> androidSetRemoteVolume(int volumeIndex) async =>
+      _cast.setVolume(volumeIndex / _volumeSteps);
+
+  @override
+  Future<void> androidAdjustRemoteVolume(
+    AndroidVolumeDirection direction,
+  ) async {
+    final step = AndroidVolumeDirection.values.entries
+        .firstWhere((e) => e.value == direction)
+        .key;
+    final now = (_cast.volume * _volumeSteps).round();
+    _cast.setVolume((now + step).clamp(0, _volumeSteps) / _volumeSteps);
+  }
+
+  /// While casting, the phone's volume keys (and its volume panel) set the other
+  /// device's volume: the session says its playback is remote. Otherwise they're the
+  /// phone's own.
+  void _syncVolume() {
+    final remote = _player.casting && _cast.connected;
+    final volume = (_cast.volume * _volumeSteps).round();
+    if (remote == _remoteVolume && (!remote || volume == _shownVolume)) return;
+    _remoteVolume = remote;
+    _shownVolume = volume;
+    androidPlaybackInfo.add(
+      remote
+          ? RemoteAndroidPlaybackInfo(
+              volumeControlType: AndroidVolumeControlType.absolute,
+              maxVolume: _volumeSteps,
+              volume: volume,
+            )
+          : LocalAndroidPlaybackInfo(),
+    );
+  }
+
   void _sync() {
+    _syncVolume();
     final track = _player.current;
     if (track != null && track.path != _shown) {
       _shown = track.path;

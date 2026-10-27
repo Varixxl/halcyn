@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../rust/api/library.dart';
 import '../signal_path_view.dart';
+import '../state/streaming.dart';
 import '../state/lyrics.dart';
 import '../state/player.dart';
 import '../theme.dart';
@@ -119,12 +120,14 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                             // Phones have their own volume keys, but those don't
                             // reach the device cast to.
                             if (MediaQuery.sizeOf(context).width >= 600 ||
-                                player.casting)
+                                player.casting) ...[
                               VolumeSlider(
                                 width: MediaQuery.sizeOf(context).width < 600
                                     ? 72
                                     : 120,
                               ),
+                              const SizedBox(width: 8),
+                            ],
                             const CastButton(compact: true),
                             if (!player.casting) const EqButton(),
                             const SizedBox(width: 8),
@@ -441,29 +444,39 @@ class _Player extends StatelessWidget {
         final art = (card ? withCard : fit).clamp(160.0, 520.0);
         return SizedBox(
           width: max(art, min(width, 340.0)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(child: _Cover(size: art)),
-              const SizedBox(height: 24),
-              const _Titles(),
-              const SizedBox(height: 14),
-              const SeekBar(),
-              const SizedBox(height: 4),
-              const _Transport(),
-              ?errorText,
-              AnimatedSize(
-                duration: Motion.medium,
-                curve: Motion.curve,
-                child: card
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 20),
-                        child: SignalPathView(path: player.signalPath!),
-                      )
-                    : const SizedBox(width: double.infinity),
-              ),
-            ],
+          // The card's lines can wrap past the room allowed for it: then this scrolls.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(child: _Cover(size: art)),
+                const SizedBox(height: 24),
+                const _Titles(),
+                const SizedBox(height: 14),
+                const SeekBar(),
+                const SizedBox(height: 4),
+                const _Transport(),
+                ?errorText,
+                AnimatedSize(
+                  duration: Motion.medium,
+                  curve: Motion.curve,
+                  child: card
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: SignalPathView(
+                            path: player.signalPath!,
+                            castTo: castTarget(context),
+                            origin:
+                                serviceNames[serviceOf(
+                                  player.current?.path ?? '',
+                                )],
+                          ),
+                        )
+                      : const SizedBox(width: double.infinity),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -575,7 +588,7 @@ class _Titles extends StatelessWidget {
                     ),
                   ),
                 ),
-              SignalBadge(path: player.signalPath),
+              SignalBadge(path: player.signalPath, castTo: castTarget(context)),
             ],
           ),
         ],

@@ -42,9 +42,13 @@ class PlaylistsPage extends StatelessWidget {
           ),
           for (final p in scope.playlists.playlists)
             _tile(
-              Icons.queue_music_rounded,
+              p.source == null
+                  ? Icons.queue_music_rounded
+                  : Icons.description_outlined,
               p.name,
-              '${p.paths.length} songs',
+              p.source == null
+                  ? '${p.paths.length} songs'
+                  : '${p.paths.length} songs · from ${p.source!.split(RegExp(r'[/\\]')).last}',
               () => onOpen(Section(Place.playlist, p.id)),
             ),
           if (scope.playlists.playlists.isEmpty)

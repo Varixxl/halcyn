@@ -19,13 +19,23 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev \
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev \
             libpipewire-0.3-dev libasound2-dev libclang-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      # Tidal's app keys (the ones the tidalapi package ships), baked into the core for
+      # the Tidal sign-in; see tools/tidal-keys.sh.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tidal keys
+        shell: bash
+        run: |
+          python -m pip install --quiet tidalapi
+          HALCYN_PYTHON=python bash tools/tidal-keys.sh
       - name: Version
         run: echo "VERSION_ARGS=$(.github/version-args.sh)" >> "$GITHUB_ENV"
       - run: flutter build linux --release $VERSION_ARGS
@@ -47,6 +57,16 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
+      # Tidal's app keys (the ones the tidalapi package ships), baked into the core for
+      # the Tidal sign-in; see tools/tidal-keys.sh.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tidal keys
+        shell: bash
+        run: |
+          python -m pip install --quiet tidalapi
+          HALCYN_PYTHON=python bash tools/tidal-keys.sh
       - name: Version
         shell: bash
         run: echo "VERSION_ARGS=$(.github/version-args.sh)" >> "$GITHUB_ENV"
@@ -86,6 +106,16 @@ jobs:
             printf 'storeFile=%s\nstorePassword=%s\nkeyPassword=%s\nkeyAlias=halcyn\n' \
               "$RUNNER_TEMP/halcyn.jks" "$PASSWORD" "$PASSWORD" > android/key.properties
           fi
+      # Tidal's app keys (the ones the tidalapi package ships), baked into the core for
+      # the Tidal sign-in; see tools/tidal-keys.sh.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tidal keys
+        shell: bash
+        run: |
+          python -m pip install --quiet tidalapi
+          HALCYN_PYTHON=python bash tools/tidal-keys.sh
       - name: Version
         run: echo "VERSION_ARGS=$(.github/version-args.sh)" >> "$GITHUB_ENV"
       - run: flutter build apk --release --split-per-abi $VERSION_ARGS

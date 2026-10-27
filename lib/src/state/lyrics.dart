@@ -34,18 +34,24 @@ class Lyrics {
   }
 }
 
-/// The `.lrc` beside the track, or null if there isn't one. `fetch` gets it from
+/// The `.lrc` beside the track, else downloaded ones, else null. `fetch` gets it from
 /// elsewhere when it isn't here.
 Future<Lyrics?> loadLyrics(
   String trackPath, {
   Future<String?> Function(String trackPath)? fetch,
 }) async {
-  try {
-    return parseLrc(await File(lyricsPath(trackPath)).readAsString());
-  } on Object {
-    if (await fetch?.call(trackPath) case final text?) return parseLrc(text);
-    return null;
+  for (final file in [
+    File(lyricsPath(trackPath)),
+    ?downloadedLyrics(trackPath),
+  ]) {
+    try {
+      return parseLrc(await file.readAsString());
+    } on Object {
+      // Not there, or unreadable.
+    }
   }
+  if (await fetch?.call(trackPath) case final text?) return parseLrc(text);
+  return null;
 }
 
 final _stamp = RegExp(r'\[(\d+):(\d+(?:[.:]\d+)?)\]');

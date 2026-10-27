@@ -20,6 +20,7 @@ import 'package:halcyn/main.dart' as app;
 import 'package:halcyn/src/cast/protocol.dart';
 import 'package:halcyn/src/cast/sender.dart';
 import 'package:halcyn/src/rust/api/library.dart';
+import 'package:halcyn/src/signal_path_view.dart';
 import 'package:halcyn/src/state/library.dart';
 import 'package:halcyn/src/state/player.dart';
 import 'package:halcyn/src/state/spectrum.dart';
@@ -117,6 +118,11 @@ void main() {
     expect(phone.current?.path, phoneCopy.path);
     await _until(tester, () => phone.signalPath != null);
     expect(phone.signalPath!.output, desktop.signalPath!.output);
+    // …which the phone labels as the desktop's.
+    expect(
+      outputLine(phone.signalPath!, cast.device!.name),
+      'On ${cast.device!.name} · ${desktop.signalPath!.output}',
+    );
 
     // Controls.
     phone.pause();

@@ -5,6 +5,8 @@ import '../state/library.dart';
 
 /// Everything the sidebar can show.
 enum Place {
+  /// What the linked streaming services suggest.
+  home,
   songs,
   albums,
   artists,

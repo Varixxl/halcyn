@@ -329,6 +329,10 @@ class PluginManager extends ChangeNotifier {
   /// Bumped by `halcyn.ui.refresh`: plugin pages render again.
   final refreshes = ValueNotifier(0);
 
+  /// Bumped when plugins have loaded (at startup, or one installed or turned on) and at
+  /// least one is running: the sidebar's wordmark flashes.
+  final loaded = ValueNotifier(0);
+
   static const _maxSource = 1 << 20;
   static const _maxStorage = 1 << 20;
   static const _maxResponse = 5 << 20;
@@ -448,6 +452,7 @@ class PluginManager extends ChangeNotifier {
     for (final p in plugins.values.toList()) {
       if (p.enabled) await _start(p);
     }
+    if (_live.isNotEmpty) loaded.value++;
     notifyListeners();
   }
 
@@ -491,6 +496,7 @@ class PluginManager extends ChangeNotifier {
     await _saveEnabled();
     final plugin = plugins[manifest.id]!;
     await _start(plugin);
+    if (plugin.running) loaded.value++;
     notifyListeners();
     return plugin.failure;
   }
@@ -501,6 +507,7 @@ class PluginManager extends ChangeNotifier {
     plugin.enabled = on;
     if (on) {
       await _start(plugin);
+      if (plugin.running) loaded.value++;
     } else {
       _stop(plugin);
     }
@@ -630,14 +637,13 @@ class PluginManager extends ChangeNotifier {
         }
         if (result == false) return null;
         if (result case {'tracks': final List<Object?> list}) {
-          final byPath = {for (final t in library.tracks) t.path: t};
           final next = [
             for (final item in list)
-              ?byPath[switch (item) {
-                {'path': final String path} => path,
-                final String path => path,
+              ?switch (item) {
+                {'path': final String path} => library.byPath(path),
+                final String path => library.byPath(path),
                 _ => null,
-              }],
+              },
           ];
           if (next.isEmpty) return null;
           tracks = next;
@@ -814,7 +820,7 @@ class PluginManager extends ChangeNotifier {
       case 'playlists.list':
         return [
           for (final p in playlists.playlists)
-            {'id': p.id, 'name': p.name, 'paths': p.paths},
+            {'id': p.id, 'name': p.name, 'paths': p.paths, 'file': p.source},
         ];
       case 'playlists.create':
         final created = await playlists.create(
@@ -1047,11 +1053,10 @@ class PluginManager extends ChangeNotifier {
   };
 
   List<String> _paths(Object? paths, {bool allowEmpty = false}) {
-    final known = {for (final t in library.tracks) t.path};
     final list = [
       if (paths is List)
         for (final p in paths)
-          if (p is String && known.contains(p)) p,
+          if (p is String && library.byPath(p) != null) p,
     ];
     if (list.isEmpty && !allowEmpty) {
       throw _Refused('none of those tracks are in the library');
@@ -1060,8 +1065,7 @@ class PluginManager extends ChangeNotifier {
   }
 
   List<Track> _tracks(Object? paths) {
-    final byPath = {for (final t in library.tracks) t.path: t};
-    return [for (final p in _paths(paths)) byPath[p]!];
+    return [for (final p in _paths(paths)) library.byPath(p)!];
   }
 
   int _queueIndex(int i) {

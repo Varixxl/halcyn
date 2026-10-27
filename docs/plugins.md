@@ -67,7 +67,7 @@ await halcyn.library.artists()          // [{ name, art, albums, paths }]
 await halcyn.library.rescan()
 
 // Playlists ("library")
-await halcyn.playlists.list()           // [{ id, name, paths }]
+await halcyn.playlists.list()           // [{ id, name, paths, file }]; file: the playlist file it's read from
 await halcyn.playlists.create(name, tracks = [])   // its id
 await halcyn.playlists.add(id, tracks)
 await halcyn.playlists.removeAt(id, index)
@@ -144,7 +144,8 @@ A track looks like this:
 
 ```js
 {
-  path, title, artists: [...], artist /* joined */, album, albumArtist,
+  path /* a file's, or tidal:<id> / ytm:<id> for a streamed song */,
+  title, artists: [...], artist /* joined */, album, albumArtist,
   year, trackNo, discNo, duration /* seconds */, sampleRate, bits, codec, plays,
   art /* cover key, for an image block's `art` */
 }

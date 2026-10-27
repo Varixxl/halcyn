@@ -39,6 +39,8 @@ pub struct Playlist {
     pub name: String,
     /// The tracks in order. Paths that are no longer in the library are kept.
     pub paths: Vec<String>,
+    /// The playlist file in the music folders it was read from, if it was.
+    pub source: Option<String>,
 }
 
 pub struct ScanProgress {
@@ -48,7 +50,7 @@ pub struct ScanProgress {
 
 static LIBRARY: Mutex<Option<Library>> = Mutex::new(None);
 
-fn with<T>(f: impl FnOnce(&mut Library) -> Result<T>) -> Result<T> {
+pub(crate) fn with<T>(f: impl FnOnce(&mut Library) -> Result<T>) -> Result<T> {
     let mut library = LIBRARY.lock().unwrap();
     f(library.as_mut().ok_or_else(|| anyhow!("the library isn't open"))?)
 }
@@ -85,6 +87,11 @@ pub fn library_scan(progress: StreamSink<ScanProgress>) -> Result<()> {
 
 pub fn library_tracks() -> Result<Vec<Track>> {
     with(|l| l.tracks())
+}
+
+/// Stores a downloaded cover for an album's tracks; returns its art key.
+pub fn library_store_fetched_art(paths: Vec<String>, image: Vec<u8>) -> Result<Option<String>> {
+    with(|l| l.store_fetched_art(&paths, &image))
 }
 
 /// Counts one listen of `path`, for Most played.

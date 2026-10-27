@@ -17,6 +17,7 @@ import 'queue_page.dart';
 import 'search_page.dart';
 import 'settings_page.dart';
 import 'sidebar.dart';
+import 'streaming.dart';
 import 'slate.dart';
 import 'songs_page.dart';
 import 'track_list.dart';
@@ -90,6 +91,7 @@ class _ShellState extends State<Shell> {
     }
     if (target == 'nowPlaying') return openNowPlaying(context);
     final place = switch (target) {
+      'home' => Place.home,
       'songs' => Place.songs,
       'albums' => Place.albums,
       'artists' => Place.artists,
@@ -162,6 +164,7 @@ class _ShellState extends State<Shell> {
   }
 
   bool get _searchable => switch (_section.value.place) {
+    Place.home ||
     Place.queue ||
     Place.settings ||
     Place.playlists ||
@@ -181,6 +184,7 @@ class _ShellState extends State<Shell> {
     Place.search => 7,
     Place.plugins => 8,
     Place.pluginPage => 9,
+    Place.home => 10,
     _ => 6,
   };
 
@@ -248,6 +252,7 @@ class _ShellState extends State<Shell> {
                 key: ValueKey(_section.value.playlist),
                 pageKey: _section.value.playlist ?? 0,
               ),
+              const HomePage(),
             ],
           ),
         ),
@@ -330,12 +335,17 @@ class _ShellState extends State<Shell> {
             bottomNavigationBar: wide
                 ? null
                 : ListenableBuilder(
-                    listenable: plugins,
+                    listenable: Listenable.merge([
+                      plugins,
+                      AppScope.of(context).streaming,
+                    ]),
                     builder: (context, _) {
                       final tabs = _phoneTabs(plugins);
                       final selected = tabs.indexWhere((t) => t.shown());
                       return NavigationBar(
-                        selectedIndex: selected < 0 ? 0 : selected,
+                        selectedIndex: selected >= 0
+                            ? selected
+                            : tabs.indexWhere((t) => t.label == 'Library'),
                         onDestinationSelected: (i) => tabs[i].open(),
                         destinations: [
                           for (final t in tabs)
@@ -354,7 +364,8 @@ class _ShellState extends State<Shell> {
     );
   }
 
-  /// The phone's bottom bar: Library, Search, Playlists, plugins' main tabs, Settings.
+  /// The phone's bottom bar: Home (with a streaming service linked), Library, Search,
+  /// Playlists, plugins' main tabs, Settings.
   /// Library (first) is selected when no other tab is.
   List<_Tab> _phoneTabs(PluginManager plugins) {
     final place = _section.value.place;
@@ -370,6 +381,14 @@ class _ShellState extends State<Shell> {
     final playlists =
         !plugins.isHidden('playlists') || !plugins.isHidden('smartPlaylists');
     return [
+      if (AppScope.of(context).streaming.linked)
+        (
+          icon: Icons.home_outlined,
+          selected: Icons.home_rounded,
+          label: 'Home',
+          open: () => _select(const Section(Place.home)),
+          shown: () => place == Place.home,
+        ),
       (
         icon: Icons.library_music_outlined,
         selected: Icons.library_music_rounded,
@@ -444,6 +463,7 @@ class _ShellState extends State<Shell> {
       Place.songs => ('Songs', library.tracks.length),
       Place.albums => ('Albums', library.albums.length),
       Place.artists => ('Artists', library.artists.length),
+      Place.home => ('Home', null),
       Place.queue => ('Queue', null),
       Place.settings => ('Settings', null),
       Place.search => ('Search', null),
@@ -506,11 +526,17 @@ class _ShellState extends State<Shell> {
         : null;
     if (place == Place.settings ||
         place == Place.playlists ||
+        place == Place.home ||
         page?.place == TabPlace.main) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
         child: Text(
-          page?.title ?? (place == Place.settings ? 'Settings' : 'Playlists'),
+          page?.title ??
+              switch (place) {
+                Place.settings => 'Settings',
+                Place.home => 'Home',
+                _ => 'Playlists',
+              },
           style: Theme.of(context).textTheme.headlineSmall,
         ),
       );

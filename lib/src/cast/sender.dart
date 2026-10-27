@@ -6,9 +6,11 @@ import 'package:flutter/foundation.dart';
 
 import '../rust/api/library.dart';
 import '../rust/api/player.dart';
+import '../rust/api/streaming.dart';
 import '../state/library.dart';
 import '../state/player.dart';
 import '../state/spectrum.dart';
+import '../state/streaming.dart';
 import 'protocol.dart';
 
 /// A Halcyn that can be cast to.
@@ -553,15 +555,26 @@ class CastController extends ChangeNotifier implements RemotePlayer {
         if (_uploads.isEmpty) break;
         final name = _uploads.removeAt(0);
         final track = _sent[name];
-        if (track == null || !File(track.path).existsSync()) continue;
+        if (track == null) continue;
         sending = track.title;
         sendProgress = 0;
         notifyListeners();
+        // A streamed song is downloaded here first, then sent like a file.
+        var file = File(track.path);
+        if (isStream(track.path)) {
+          try {
+            file = File(await streamingDownload(path: track.path));
+          } on Object catch (e) {
+            debugPrint('cast: downloading ${track.path}: $e');
+            continue;
+          }
+        }
+        if (!file.existsSync()) continue;
         final lyrics = File(lyricsPath(track.path));
         if (lyrics.existsSync()) {
           await _put('/file/${name.split('.').first}.lrc', lyrics);
         }
-        await _put('/file/$name', File(track.path), progress: true);
+        await _put('/file/$name', file, progress: true);
       }
     } finally {
       _uploading = false;

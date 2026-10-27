@@ -41,8 +41,9 @@ pub struct Scanned {
     pub picture: Option<Vec<u8>>,
 }
 
-pub fn find_audio(folders: &[String]) -> Vec<Found> {
-    let mut found = Vec::new();
+/// The audio files and the playlist files under `folders`.
+pub fn find_files(folders: &[String]) -> (Vec<Found>, Vec<Found>) {
+    let (mut found, mut playlists) = (Vec::new(), Vec::new());
     for folder in folders {
         for entry in jwalk::WalkDir::new(folder).skip_hidden(true).into_iter().flatten() {
             let path = entry.path();
@@ -50,7 +51,8 @@ pub fn find_audio(folders: &[String]) -> Vec<Found> {
                 .extension()
                 .and_then(|e| e.to_str())
                 .is_some_and(|e| AUDIO_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()));
-            if !is_audio || !entry.file_type().is_file() {
+            let is_playlist = super::playlist_files::is_playlist(&path);
+            if !(is_audio || is_playlist) || !entry.file_type().is_file() {
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
@@ -59,10 +61,15 @@ pub fn find_audio(folders: &[String]) -> Vec<Found> {
                 .ok()
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map_or(0, |d| d.as_secs() as i64);
-            found.push(Found { path, mtime, size: meta.len() as i64 });
+            let file = Found { path, mtime, size: meta.len() as i64 };
+            if is_audio {
+                found.push(file)
+            } else {
+                playlists.push(file)
+            }
         }
     }
-    found
+    (found, playlists)
 }
 
 pub fn read(file: &Found) -> Option<Scanned> {

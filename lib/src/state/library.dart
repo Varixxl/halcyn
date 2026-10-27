@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import '../rust/api/library.dart';
@@ -29,6 +32,10 @@ class Artist {
 /// The indexed music, grouped for browsing.
 class LibraryController extends ChangeNotifier {
   List<Track> tracks = const [];
+
+  /// Songs from Tidal and YouTube Music come across, by path (see `StreamingController`).
+  final Map<String, Track> streams = {};
+  Map<String, Track> _byPath = const {};
   List<Album> albums = const [];
   List<Artist> artists = const [];
   List<String> folders = const [];
@@ -55,11 +62,19 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> _findLyrics() async {
+    Future<bool> has(String path) async =>
+        await File(lyricsPath(path)).exists() ||
+        (await downloadedLyrics(path)?.exists() ?? false);
     final found = await Future.wait([
-      for (final t in tracks)
-        File(lyricsPath(t.path)).exists().then((has) => has ? t.path : null),
+      for (final t in tracks) has(t.path).then((has) => has ? t.path : null),
     ]);
     withLyrics = found.nonNulls.toSet();
+    notifyListeners();
+  }
+
+  /// Lyrics were downloaded for these.
+  void addLyrics(Set<String> paths) {
+    withLyrics = {...withLyrics, ...paths};
     notifyListeners();
   }
 
@@ -140,9 +155,19 @@ class LibraryController extends ChangeNotifier {
     await rescan();
   }
 
-  Track? byPath(String path) => tracks.where((t) => t.path == path).firstOrNull;
+  /// A file in the library, or a streamed song come across.
+  Track? byPath(String path) => _byPath[path] ?? streams[path];
+
+  /// Streamed songs, new or with fresh details.
+  void addStreams(List<Track> found) {
+    for (final t in found) {
+      streams[t.path] = t;
+    }
+    if (found.isNotEmpty) notifyListeners();
+  }
 
   void _group() {
+    _byPath = {for (final t in tracks) t.path: t};
     final albums = <String, Album>{};
     final artists = <String, Artist>{};
     for (final track in tracks) {
@@ -183,6 +208,18 @@ class LibraryController extends ChangeNotifier {
     }
   }
 }
+
+/// Where downloaded lyrics live (see `Fetcher`): Halcyn's own folder, not the music
+/// folders. Set at startup; lyrics beside a track come first.
+Directory? downloadedLyricsDir;
+
+/// The downloaded `.lrc` for a track, if [downloadedLyricsDir] is set.
+File? downloadedLyrics(String trackPath) => switch (downloadedLyricsDir) {
+  final dir? => File(
+    '${dir.path}/${sha1.convert(utf8.encode(trackPath)).toString().substring(0, 24)}.lrc',
+  ),
+  null => null,
+};
 
 /// Where a track's synced lyrics live: beside it, as `.lrc`.
 String lyricsPath(String trackPath) {

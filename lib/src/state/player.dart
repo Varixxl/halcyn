@@ -161,6 +161,15 @@ class PlayerController extends ChangeNotifier {
   )?
   beforePlay;
 
+  /// What actually plays for a track: the streaming settings swap a stream for an
+  /// equally good file of the user's own.
+  Track Function(Track track)? substitute;
+
+  List<Track> _substituted(List<Track> tracks) => switch (substitute) {
+    final swap? => [for (final t in tracks) swap(t)],
+    null => tracks,
+  };
+
   /// `hooks`: let [beforePlay] change it first.
   void playTracks(List<Track> tracks, int start, {bool hooks = true}) {
     if (hooks && beforePlay != null && tracks.isNotEmpty) {
@@ -171,6 +180,7 @@ class PlayerController extends ChangeNotifier {
       });
       return;
     }
+    tracks = _substituted(tracks);
     if (_remote case final remote?) {
       return remote.play(tracks, start, 'replace');
     }
@@ -195,6 +205,7 @@ class PlayerController extends ChangeNotifier {
 
   /// Plays `tracks` right after the current one.
   void playNext(List<Track> tracks) {
+    tracks = _substituted(tracks);
     if (_remote case final remote?) return remote.play(tracks, 0, 'next');
     if (current == null) return playTracks(tracks, 0);
     _edit([
@@ -205,6 +216,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   void addToQueue(List<Track> tracks) {
+    tracks = _substituted(tracks);
     if (_remote case final remote?) return remote.play(tracks, 0, 'append');
     if (current == null) return playTracks(tracks, 0);
     _edit([...queue, ...tracks], index);
