@@ -121,6 +121,30 @@ void main() {
     Future<void> settle() =>
         Future<void>.delayed(const Duration(milliseconds: 900));
 
+    test('the next song shows at once, position ticks and all', () async {
+      player.queue = [
+        _track('/music/a.flac', 'First'),
+        _track('/music/b.flac', 'Second'),
+      ];
+      player.index = 0;
+      events.add(const PlayerEvent.playing(playing: true));
+      for (var i = 0; i < 6; i++) {
+        events.add(PlayerEvent.position(secs: 30.0 + i * 0.25));
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      expect(sent.last!['details'], 'First');
+      // The next song: the position starts again from 0, ticking as songs do.
+      player.index = 1;
+      events.add(const PlayerEvent.playing(playing: true));
+      final changed = DateTime.now();
+      for (var i = 0; i < 8 && sent.last!['details'] != 'Second'; i++) {
+        events.add(PlayerEvent.position(secs: i * 0.1));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(sent.last!['details'], 'Second');
+      expect(DateTime.now().difference(changed).inMilliseconds, lessThan(700));
+    });
+
     test('shows what plays, clears on pause and comes back', () async {
       await settle();
       expect(sent, [null]);

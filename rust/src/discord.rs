@@ -3,6 +3,7 @@
 //! of its own keeps Discord showing the latest activity, at most one update every few
 //! seconds (Discord's limit), and looks for Discord again every so often while it's closed.
 
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::sync::{Condvar, LazyLock, Mutex};
 use std::time::{Duration, Instant};
@@ -11,8 +12,10 @@ use anyhow::{anyhow, bail, Result};
 
 /// Between looks for Discord while it's closed.
 const RETRY: Duration = Duration::from_secs(20);
-/// Discord takes 5 updates in 20 s.
-const GAP: Duration = Duration::from_secs(4);
+/// Discord takes 5 updates in any 20 s: a song change goes at once unless that many went
+/// lately.
+const BURST: usize = 5;
+const WINDOW: Duration = Duration::from_secs(20);
 
 #[derive(Default)]
 struct State {
@@ -59,7 +62,7 @@ struct Conn {
 fn run() {
     let (lock, ready) = &*STATE;
     let mut conn: Option<Conn> = None;
-    let mut last: Option<Instant> = None;
+    let mut recent: VecDeque<Instant> = VecDeque::new();
     loop {
         let (app_id, want) = {
             let state = lock.lock().unwrap();
@@ -69,11 +72,14 @@ fn run() {
             }
             (state.app_id.clone(), state.want.clone())
         };
-        if let Some(wait) = last.and_then(|t| (t + GAP).checked_duration_since(Instant::now())) {
-            std::thread::sleep(wait);
+        while recent.front().is_some_and(|t| t.elapsed() >= WINDOW) {
+            recent.pop_front();
+        }
+        if recent.len() >= BURST {
+            std::thread::sleep(WINDOW.saturating_sub(recent[0].elapsed()));
             continue; // (what to show may have changed meanwhile)
         }
-        last = Some(Instant::now());
+        recent.push_back(Instant::now());
         let result = (|| -> Result<()> {
             if conn.as_ref().is_some_and(|c| c.app_id != app_id) {
                 conn = None;

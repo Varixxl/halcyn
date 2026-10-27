@@ -260,13 +260,13 @@ class DiscordPresence extends ChangeNotifier {
     if ((there - player.position.value * 1000).abs() > 3000) _later();
   }
 
-  /// In a moment, once the position has caught up.
+  /// In a moment, once the position has caught up. A wait already under way isn't
+  /// pushed back: a new song's position ticks would otherwise keep putting it off.
   void _later() {
-    _soon?.cancel();
-    _soon = Timer(
-      const Duration(milliseconds: 800),
-      () => unawaited(_update()),
-    );
+    _soon ??= Timer(const Duration(milliseconds: 300), () {
+      _soon = null;
+      unawaited(_update());
+    });
   }
 
   Future<void> _update() async {
