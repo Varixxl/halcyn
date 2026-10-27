@@ -292,6 +292,22 @@ impl Library {
         Ok(())
     }
 
+    /// A playlist file from anywhere (`name` is its file name, `path` where it was, for
+    /// entries relative to it): its title, the library tracks it lists, and how many
+    /// entries it has.
+    pub fn read_playlist_file(&self, path: &str, name: &str, bytes: &[u8]) -> Result<(String, Vec<String>, usize)> {
+        let library: Vec<String> = self
+            .db
+            .prepare("SELECT path FROM tracks")?
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        let resolver = playlist_files::Resolver::new(library.iter().map(String::as_str));
+        let parsed = playlist_files::parse(Path::new(name), bytes);
+        let paths = parsed.entries.iter().filter_map(|e| resolver.resolve(Path::new(path), e)).collect();
+        let title = parsed.title.unwrap_or_else(|| playlist_files::default_name(Path::new(name)));
+        Ok((title, paths, parsed.entries.len()))
+    }
+
     pub fn tracks(&self) -> Result<Vec<Track>> {
         let mut stmt = self.db.prepare(
             "SELECT id, tracks.path, title, artists, album, album_artist, track_no, disc_no,
@@ -622,6 +638,39 @@ mod tests {
         // And when the file is removed, its playlist is too.
         std::fs::remove_file(&list).unwrap();
         lib.scan(|_, _| {}).unwrap();
+        assert!(lib.playlists().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_playlist_file_from_elsewhere_finds_its_songs() {
+        let root = std::env::temp_dir().join(format!("halcyn-import-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let music = root.join("Music");
+        for name in ["Artist/Album/one.wav", "Artist/Album/two.wav"] {
+            wav(&music.join(name));
+        }
+        let mut lib = Library::open(&root.join("data"), &root.join("cache")).unwrap();
+        lib.set_folders(&[music.to_string_lossy().into_owned()]).unwrap();
+        lib.scan(|_, _| {}).unwrap();
+        let path = |p: &str| music.join(p).to_string_lossy().into_owned();
+
+        // Written on a Windows PC, read from Downloads.
+        let xspf = r#"<?xml version="1.0"?><playlist><title>Mine &amp; yours</title><trackList>
+            <track><location>file:///D:/Music/Artist/Album/two.wav</location></track>
+            <track><location>file:///D:/Music/Artist/Album/gone.wav</location></track>
+            <track><location>D:\Music\Artist\Album\one.wav</location></track>
+            </trackList></playlist>"#;
+        let (name, paths, entries) =
+            lib.read_playlist_file("/home/me/Downloads/mine.xspf", "mine.xspf", xspf.as_bytes()).unwrap();
+        assert_eq!(name, "Mine & yours");
+        assert_eq!(paths, vec![path("Artist/Album/two.wav"), path("Artist/Album/one.wav")]);
+        assert_eq!(entries, 3);
+
+        // No title: the file's name.
+        let (name, paths, _) = lib.read_playlist_file("/cache/x", "Road Trip.m3u", b"Album/one.wav\n").unwrap();
+        assert_eq!((name.as_str(), paths), ("Road Trip", vec![path("Artist/Album/one.wav")]));
+        // Reading it adds no playlist by itself.
         assert!(lib.playlists().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }

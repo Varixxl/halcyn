@@ -43,6 +43,15 @@ pub struct Playlist {
     pub source: Option<String>,
 }
 
+/// What a playlist file chosen by the user lists, before it becomes a playlist.
+pub struct PlaylistFile {
+    pub name: String,
+    /// The library tracks it lists, in order.
+    pub paths: Vec<String>,
+    /// How many entries the file has, found in the library or not.
+    pub entries: u32,
+}
+
 pub struct ScanProgress {
     pub done: u32,
     pub total: u32,
@@ -106,6 +115,15 @@ pub fn library_playlists() -> Result<Vec<Playlist>> {
 /// Returns the new playlist's id.
 pub fn library_create_playlist(name: String, paths: Vec<String>) -> Result<i64> {
     with(|l| l.create_playlist(&name, &paths))
+}
+
+/// Reads a .m3u, .m3u8, .pls or .xspf file: `name` is its file name, `path` where it is
+/// (entries can be relative to it).
+pub fn library_read_playlist_file(path: String, name: String, bytes: Vec<u8>) -> Result<PlaylistFile> {
+    with(|l| {
+        let (name, paths, entries) = l.read_playlist_file(&path, &name, &bytes)?;
+        Ok(PlaylistFile { name, paths, entries: entries as u32 })
+    })
 }
 
 pub fn library_rename_playlist(id: i64, name: String) -> Result<()> {

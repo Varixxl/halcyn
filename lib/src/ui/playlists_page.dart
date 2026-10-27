@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'places.dart';
+import 'playlist_import.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -34,10 +35,25 @@ class PlaylistsPage extends StatelessWidget {
             ),
           SectionLabel(
             'Your playlists',
-            trailing: TextButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('New'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton.icon(
+                  onPressed: () async {
+                    final playlist = await importPlaylistFile(context);
+                    if (playlist != null) {
+                      onOpen(Section(Place.playlist, playlist.id));
+                    }
+                  },
+                  icon: const Icon(Icons.file_open_outlined, size: 18),
+                  label: const Text('Import'),
+                ),
+                TextButton.icon(
+                  onPressed: onCreate,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('New'),
+                ),
+              ],
             ),
           ),
           for (final p in scope.playlists.playlists)
@@ -55,7 +71,7 @@ class PlaylistsPage extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Text(
-                'None yet. Tap New, or long-press any song.',
+                'None yet. Tap New or Import, or long-press any song.',
                 style: TextStyle(color: Palette.textMuted),
               ),
             ),

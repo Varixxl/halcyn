@@ -15,6 +15,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:halcyn/main.dart' as app;
 import 'package:halcyn/src/rust/api/player.dart';
@@ -57,6 +58,14 @@ void main() {
     expect(find.byType(TrackRow), findsWidgets);
     final scope = tester.widget<AppScope>(find.byType(AppScope));
     final state = scope.player;
+    // The cover card shown, whatever the user chose (put back afterwards).
+    final cardShown = scope.themes.nowPlayingCard.value;
+    addTearDown(() async {
+      scope.themes.nowPlayingCard.value = cardShown;
+      // Saving happens in the background: let it finish before the app quits.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    scope.themes.nowPlayingCard.value = true;
 
     // Play the first song: it shows up in the sidebar card with its signal path.
     final first = tester.widget<TrackRow>(find.byType(TrackRow).first).track;
@@ -242,6 +251,39 @@ void main() {
     await _wait(tester, 1000);
     expect(scope.playlists.byId(made.id), isNull);
     expect(find.widgetWithText(SideItem, 'Halcyn test'), findsNothing);
+
+    // Import a playlist file: the songs it lists from the library, in its order.
+    final [one, two, ...] = scope.library.tracks;
+    FileSelectorPlatform.instance = _Picker(
+      XFile.fromData(
+        utf8.encode(
+          '#EXTM3U\n#PLAYLIST:Halcyn import\n${two.path}\n'
+          '/nowhere/gone.flac\n${one.path}\n',
+        ),
+        name: 'import.m3u8',
+        path: '/nowhere/import.m3u8',
+      ),
+    );
+    await tester.ensureVisible(find.byTooltip('Import playlist file'));
+    await _wait(tester, 300);
+    await tester.tap(find.byTooltip('Import playlist file'));
+    await _wait(tester, 1000);
+    final imported = scope.playlists.playlists.last;
+    addTearDown(() {
+      if (scope.playlists.byId(imported.id) != null) {
+        scope.playlists.delete(imported);
+      }
+    });
+    expect(imported.name, 'Halcyn import');
+    expect(imported.paths, [two.path, one.path]);
+    expect(
+      find.text('Imported "Halcyn import": 2 songs (1 not in your library)'),
+      findsOneWidget,
+    );
+    expect(find.byType(TrackRow), findsNWidgets(2));
+    await _shot('7b-imported');
+    scope.playlists.delete(imported);
+    await _wait(tester, 600);
 
     // Search the songs page (top right).
     Finder field(String hint) => find.byWidgetPredicate(
@@ -441,7 +483,7 @@ void main() {
     );
     await _wait(tester, 400);
     expect(find.text('Streaming'), findsOneWidget);
-    expect(find.text('Tidal'), findsOneWidget);
+    expect(find.text('Tidal'), findsWidgets);
     final streaming = scope.streaming;
     expect(find.text(streaming.youtube ? 'Sign out' : 'Sign in'), findsWidgets);
     expect(find.text('Home'), streaming.linked ? findsWidgets : findsNothing);
@@ -554,4 +596,18 @@ Future<void> _shot(String name) async {
     '${at[0]},${at[1]} ${size[0]}x${size[1]}',
     '$dir/$name.png',
   ]);
+}
+
+/// Hands the app [file] instead of showing a file picker.
+class _Picker extends FileSelectorPlatform {
+  _Picker(this.file);
+
+  final XFile file;
+
+  @override
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) async => file;
 }

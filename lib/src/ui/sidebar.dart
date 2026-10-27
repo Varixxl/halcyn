@@ -9,6 +9,7 @@ import '../window.dart';
 import 'now_playing.dart';
 import 'places.dart';
 import 'player_bar.dart';
+import 'playlist_import.dart';
 import 'plugin_view.dart';
 import 'slate.dart';
 import 'widgets.dart';
@@ -128,13 +129,26 @@ class Sidebar extends StatelessWidget {
                     if (shown('playlists')) ...[
                       SectionLabel(
                         'Playlists',
-                        trailing: IconButton(
-                          onPressed: () => _create(context),
-                          icon: const Icon(Icons.add_rounded),
-                          iconSize: 18,
-                          color: Palette.textMuted,
-                          visualDensity: VisualDensity.compact,
-                          tooltip: 'New playlist',
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () => _import(context),
+                              icon: const Icon(Icons.file_open_outlined),
+                              iconSize: 18,
+                              color: Palette.textMuted,
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'Import playlist file',
+                            ),
+                            IconButton(
+                              onPressed: () => _create(context),
+                              icon: const Icon(Icons.add_rounded),
+                              iconSize: 18,
+                              color: Palette.textMuted,
+                              visualDensity: VisualDensity.compact,
+                              tooltip: 'New playlist',
+                            ),
+                          ],
                         ),
                       ),
                       for (final p in scope.playlists.playlists)
@@ -199,6 +213,11 @@ class Sidebar extends StatelessWidget {
     if (name == null) return;
     final playlist = await playlists.create(name);
     onSelect(Section(Place.playlist, playlist.id));
+  }
+
+  Future<void> _import(BuildContext context) async {
+    final playlist = await importPlaylistFile(context);
+    if (playlist != null) onSelect(Section(Place.playlist, playlist.id));
   }
 }
 

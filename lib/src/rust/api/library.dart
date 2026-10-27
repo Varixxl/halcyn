@@ -58,6 +58,18 @@ Future<PlatformInt64> libraryCreatePlaylist({
   paths: paths,
 );
 
+/// Reads a .m3u, .m3u8, .pls or .xspf file: `name` is its file name, `path` where it is
+/// (entries can be relative to it).
+Future<PlaylistFile> libraryReadPlaylistFile({
+  required String path,
+  required String name,
+  required List<int> bytes,
+}) => RustLib.instance.api.crateApiLibraryLibraryReadPlaylistFile(
+  path: path,
+  name: name,
+  bytes: bytes,
+);
+
 Future<void> libraryRenamePlaylist({
   required PlatformInt64 id,
   required String name,
@@ -117,6 +129,35 @@ class Playlist {
           name == other.name &&
           paths == other.paths &&
           source == other.source;
+}
+
+/// What a playlist file chosen by the user lists, before it becomes a playlist.
+class PlaylistFile {
+  final String name;
+
+  /// The library tracks it lists, in order.
+  final List<String> paths;
+
+  /// How many entries the file has, found in the library or not.
+  final int entries;
+
+  const PlaylistFile({
+    required this.name,
+    required this.paths,
+    required this.entries,
+  });
+
+  @override
+  int get hashCode => name.hashCode ^ paths.hashCode ^ entries.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlaylistFile &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          paths == other.paths &&
+          entries == other.entries;
 }
 
 class ScanProgress {
