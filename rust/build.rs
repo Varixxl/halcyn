@@ -34,9 +34,15 @@ fn stretch() {
         // It runs per audio buffer: fast even in a debug build.
         .opt_level(3)
         .warnings(false);
-    // Linked in, so the APK needs no libc++_shared.so of its own.
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android") {
+    // Linked in, so the APK needs no libc++_shared.so of its own. libc++abi too: it has
+    // the exceptions' type info (std::length_error...), and without it the core won't
+    // load on Android at all.
+    let android = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("android");
+    if android {
         build.cpp_link_stdlib("c++_static");
     }
     build.compile("halcyn_stretch");
+    if android {
+        println!("cargo:rustc-link-lib=c++abi");
+    }
 }
