@@ -115,7 +115,7 @@ class _SoundPanel extends StatelessWidget {
     final sound = AppScope.of(context).sound;
     final theme = Theme.of(context);
     return DefaultTabController(
-      length: 2,
+      length: 3,
       initialIndex: initialTab,
       child: ListenableBuilder(
         listenable: sound,
@@ -161,10 +161,17 @@ class _SoundPanel extends StatelessWidget {
                       ? 'Headphones'
                       : 'Headphones · ${sound.correction!.name}',
                 ),
+                Tab(
+                  text: sound.tempoChanged
+                      ? 'Pitch & speed · ${_tempo(sound)}'
+                      : 'Pitch & speed',
+                ),
               ],
             ),
             const Expanded(
-              child: TabBarView(children: [_EqualizerTab(), _HeadphonesTab()]),
+              child: TabBarView(
+                children: [_EqualizerTab(), _HeadphonesTab(), _TempoTab()],
+              ),
             ),
           ],
         ),
@@ -291,6 +298,207 @@ class _EqualizerTab extends StatelessWidget {
 String _db(double db) => db == 0
     ? '0'
     : '${db > 0 ? '+' : '−'}${db.abs().toStringAsFixed(db == db.roundToDouble() ? 0 : 1)}';
+
+String _semitones(double n) =>
+    '${n > 0
+        ? '+'
+        : n < 0
+        ? '−'
+        : ''}'
+    '${n.abs().toStringAsFixed(n == n.roundToDouble() ? 0 : 1)}';
+
+String _times(double x) =>
+    '${x.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '')}×';
+
+/// "+2 · 1.25×": what's changed, for the tab.
+String _tempo(SoundController sound) => [
+  if (sound.pitch != 0) _semitones(sound.pitch),
+  if (sound.speed != 1) _times(sound.speed),
+].join(' · ');
+
+/// Pitch and speed, each on its own: the pitch moves without the song speeding up, and
+/// the speed changes without the pitch moving. Whatever plays, until they're reset.
+class _TempoTab extends StatelessWidget {
+  const _TempoTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final sound = AppScope.of(context).sound;
+    return ListenableBuilder(
+      listenable: sound,
+      builder: (context, _) => ListView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+        children: [
+          _TempoCard(
+            title: 'Pitch',
+            hint: 'Higher or lower, at the same speed',
+            value: sound.pitch,
+            shown: sound.pitch == 0
+                ? 'Original'
+                : '${_semitones(sound.pitch)} '
+                      '${sound.pitch.abs() == 1 ? 'semitone' : 'semitones'}',
+            min: -SoundController.maxPitch,
+            max: SoundController.maxPitch,
+            divisions: 48,
+            step: 1,
+            normal: 0,
+            onChanged: (v, {live = true}) => sound.setPitch(v, live: live),
+            picks: const [-2, -1, 0, 1, 2],
+            pick: (v) => v == 0 ? '0' : _semitones(v),
+          ),
+          const SizedBox(height: 16),
+          _TempoCard(
+            title: 'Speed',
+            hint: 'Faster or slower, at the same pitch',
+            value: sound.speed,
+            shown: sound.speed == 1 ? 'Normal' : _times(sound.speed),
+            min: SoundController.minSpeed,
+            max: SoundController.maxSpeed,
+            divisions: 30,
+            step: 0.05,
+            normal: 1,
+            onChanged: (v, {live = true}) => sound.setSpeed(v, live: live),
+            picks: const [0.75, 0.9, 1, 1.1, 1.25, 1.5],
+            pick: _times,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Applies to every song until you set it back. Changing either one '
+            'takes the song through Halcyn\'s own processing, so it\'s no longer '
+            'bit-exact.',
+            style: TextStyle(color: Palette.textMuted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TempoCard extends StatelessWidget {
+  const _TempoCard({
+    required this.title,
+    required this.hint,
+    required this.value,
+    required this.shown,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.step,
+    required this.normal,
+    required this.onChanged,
+    required this.picks,
+    required this.pick,
+  });
+
+  final String title;
+  final String hint;
+  final double value;
+  final String shown;
+  final double min;
+  final double max;
+  final int divisions;
+
+  /// What the − and + buttons move it by.
+  final double step;
+  final double normal;
+  final void Function(double value, {bool live}) onChanged;
+  final List<double> picks;
+  final String Function(double) pick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final changed = value != normal;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+      decoration: BoxDecoration(
+        color: Palette.surfaceHigh,
+        borderRadius: BorderRadius.circular(Palette.r(14)),
+        border: Border.all(
+          color: changed
+              ? Palette.accent.withValues(alpha: 0.5)
+              : Palette.outline,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      hint,
+                      style: TextStyle(color: Palette.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: Motion.fast,
+                child: Text(
+                  shown,
+                  key: ValueKey(shown),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: changed ? Palette.accentLight : Palette.text,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              TextButton(
+                onPressed: changed ? () => onChanged(normal) : null,
+                child: const Text('Reset'),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              IconButton(
+                onPressed: value > min ? () => onChanged(value - step) : null,
+                icon: const Icon(Icons.remove_rounded),
+                tooltip: 'Lower',
+              ),
+              Expanded(
+                child: Slider(
+                  value: value.clamp(min, max),
+                  min: min,
+                  max: max,
+                  divisions: divisions,
+                  onChanged: (v) => onChanged(v, live: false),
+                  onChangeEnd: onChanged,
+                ),
+              ),
+              IconButton(
+                onPressed: value < max ? () => onChanged(value + step) : null,
+                icon: const Icon(Icons.add_rounded),
+                tooltip: 'Higher',
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final p in picks)
+                Pill(
+                  label: pick(p),
+                  selected: value == p,
+                  onPressed: () => onChanged(p),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// A labelled bass or treble slider.
 class _Tone extends StatelessWidget {

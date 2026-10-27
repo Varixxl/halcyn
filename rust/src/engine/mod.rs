@@ -6,6 +6,7 @@ pub mod dsp;
 mod output;
 pub(crate) mod source;
 mod spectrum;
+pub mod stretch;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
@@ -21,6 +22,7 @@ use convert::Converter;
 use output::{Output, Shared};
 use source::{Source, SourceInfo};
 use spectrum::{Analyzer, History};
+use stretch::{Stretch, Tempo};
 
 /// Receives the visualizer's band levels.
 pub type SpectrumSink = Box<dyn Fn(Vec<f32>) + Send>;
@@ -37,6 +39,8 @@ pub enum Command {
     Spectrum(Option<SpectrumSink>),
     /// New volume and EQ. `label` describes them for the signal path, None when bypassed.
     Sound { design: dsp::Design, label: Option<String> },
+    /// New pitch and speed. Playing carries on from where it is, changed.
+    Tempo(Tempo),
     Play,
     Pause,
     Stop,
@@ -94,6 +98,10 @@ struct Session {
     history: Option<History>,
     /// Track position this session started at.
     start_secs: f64,
+    /// Pitch and speed, when either isn't at its default.
+    stretch: Option<Stretch>,
+    /// How much song each frame played covers.
+    speed: f64,
     block: Vec<i32>,
     block_pos: usize,
     decoding_done: bool,
@@ -111,6 +119,11 @@ impl Session {
                 if !self.converter.pull(source, &mut self.block)? {
                     self.decoding_done = true;
                     self.block.clear();
+                    if let Some(stretch) = &mut self.stretch {
+                        stretch.finish(&mut self.block);
+                    }
+                } else if let Some(stretch) = &mut self.stretch {
+                    stretch.process(&mut self.block);
                 }
                 self.block_pos = 0;
                 continue;
@@ -131,7 +144,7 @@ impl Session {
     }
 
     fn position(&self) -> f64 {
-        self.start_secs + self.shared.frames_played.load(Relaxed) as f64 / self.rate as f64
+        self.start_secs + self.shared.frames_played.load(Relaxed) as f64 / self.rate as f64 * self.speed
     }
 
     fn ring_empty(&self) -> bool {
@@ -167,6 +180,7 @@ struct Runner {
     dsp: Arc<dsp::Control>,
     /// What the volume and EQ do, for the signal path; None when they're bypassed.
     sound: Option<String>,
+    tempo: Tempo,
     repeat: Repeat,
 }
 
@@ -186,6 +200,7 @@ impl Runner {
             spectrum: None,
             dsp: Arc::default(),
             sound: None,
+            tempo: Tempo::default(),
             repeat: Repeat::Off,
         }
     }
@@ -229,6 +244,17 @@ impl Runner {
                 if label != self.sound {
                     self.sound = label;
                     self.emit_path();
+                }
+            }
+            Command::Tempo(tempo) => {
+                if tempo == self.tempo {
+                    return Ok(());
+                }
+                self.tempo = tempo;
+                if self.session.is_some() {
+                    let at = self.position();
+                    self.end_session();
+                    self.start_session(at, !self.playing)?;
                 }
             }
             Command::Spectrum(sink) => {
@@ -415,6 +441,8 @@ impl Runner {
             written: 0,
             history: None,
             start_secs,
+            stretch: self.tempo.active().then(|| Stretch::new(self.tempo, rate, info.channels)),
+            speed: self.tempo.speed,
             block: Vec::new(),
             block_pos: 0,
             decoding_done: false,
@@ -444,7 +472,15 @@ impl Runner {
                 khz(info.sample_rate)
             )
         });
-        let path = signal_path(info, &session.converter, output.caps().backend, session.rate, warning, self.sound.as_deref());
+        let tempo = session.stretch.is_some().then(|| self.tempo.label()).flatten();
+        let path = signal_path(
+            info,
+            &session.converter,
+            output.caps().backend,
+            session.rate,
+            warning,
+            [tempo.as_deref(), self.sound.as_deref()],
+        );
         (self.emit)(PlayerEvent::Path { path });
     }
 
@@ -500,7 +536,8 @@ fn signal_path(
     backend: &str,
     rate: u32,
     warning: Option<String>,
-    sound: Option<&str>,
+    // Pitch and speed, then volume and EQ, when they're in the path.
+    stages: [Option<&str>; 2],
 ) -> SignalPath {
     let codec = if info.codec.starts_with("pcm_") { "PCM".into() } else { info.codec.to_uppercase() };
     let mut source = vec![codec];
@@ -518,7 +555,7 @@ fn signal_path(
     if !converter.is_passthrough() {
         steps.push(format!("Resampled {} → {}", khz(info.sample_rate), khz(rate)));
     }
-    steps.extend(sound.map(String::from));
+    steps.extend(stages.into_iter().flatten().map(String::from));
     let processing = if steps.is_empty() {
         if info.lossless { "Bit-exact".into() } else { "Bit-exact from the decoder".into() }
     } else {

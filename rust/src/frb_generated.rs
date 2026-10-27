@@ -3216,10 +3216,14 @@ impl SseDecode for crate::api::sound::SoundSettings {
         let mut var_volume = <f64>::sse_decode(deserializer);
         let mut var_eq = <bool>::sse_decode(deserializer);
         let mut var_filters = <Vec<crate::api::sound::EqFilter>>::sse_decode(deserializer);
+        let mut var_pitch = <f64>::sse_decode(deserializer);
+        let mut var_speed = <f64>::sse_decode(deserializer);
         return crate::api::sound::SoundSettings {
             volume: var_volume,
             eq: var_eq,
             filters: var_filters,
+            pitch: var_pitch,
+            speed: var_speed,
         };
     }
 }
@@ -3881,6 +3885,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::sound::SoundSettings {
             self.volume.into_into_dart().into_dart(),
             self.eq.into_into_dart().into_dart(),
             self.filters.into_into_dart().into_dart(),
+            self.pitch.into_into_dart().into_dart(),
+            self.speed.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4429,6 +4435,8 @@ impl SseEncode for crate::api::sound::SoundSettings {
         <f64>::sse_encode(self.volume, serializer);
         <bool>::sse_encode(self.eq, serializer);
         <Vec<crate::api::sound::EqFilter>>::sse_encode(self.filters, serializer);
+        <f64>::sse_encode(self.pitch, serializer);
+        <f64>::sse_encode(self.speed, serializer);
     }
 }
 

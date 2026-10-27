@@ -1,7 +1,9 @@
-//! Volume and the equalizer. Applied on the output's audio thread, so changes are heard at once.
+//! Volume and the equalizer, applied on the output's audio thread so changes are heard at
+//! once, and pitch and speed (see `crate::engine::stretch`).
 
 use crate::api::player::engine;
 use crate::engine::dsp::{self, Design, Filter, Kind};
+use crate::engine::stretch::Tempo;
 use crate::engine::Command;
 
 #[derive(Clone, Copy, Debug)]
@@ -26,6 +28,10 @@ pub struct SoundSettings {
     pub eq: bool,
     /// The headphone correction, the bands and the bass and treble shelves, in order.
     pub filters: Vec<EqFilter>,
+    /// Up or down in semitones (-12..12) without changing the speed.
+    pub pitch: f64,
+    /// 0.5..2 times as fast, without changing the pitch.
+    pub speed: f64,
 }
 
 pub struct SoundInfo {
@@ -83,5 +89,6 @@ pub fn sound_set(settings: SoundSettings) -> SoundInfo {
     }
     let label = (!label.is_empty()).then(|| label.join(" · "));
     engine().send(Command::Sound { design, label });
+    engine().send(Command::Tempo(Tempo::new(settings.pitch, settings.speed)));
     SoundInfo { preamp_db: if eq { preamp_db } else { 0.0 }, curve }
 }

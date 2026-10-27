@@ -218,8 +218,9 @@ class DownloadsController extends ChangeNotifier {
     );
     if (inside) {
       await library.rescan();
-    } else {
+    } else if (persist) {
       await library.setFolders([...library.folders, folder]);
     }
+    // A test's folder never joins the library (its folders are the user's).
   }
 }

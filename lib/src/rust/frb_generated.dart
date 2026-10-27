@@ -3047,12 +3047,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SoundSettings dco_decode_sound_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return SoundSettings(
       volume: dco_decode_f_64(arr[0]),
       eq: dco_decode_bool(arr[1]),
       filters: dco_decode_list_eq_filter(arr[2]),
+      pitch: dco_decode_f_64(arr[3]),
+      speed: dco_decode_f_64(arr[4]),
     );
   }
 
@@ -3656,7 +3658,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_volume = sse_decode_f_64(deserializer);
     var var_eq = sse_decode_bool(deserializer);
     var var_filters = sse_decode_list_eq_filter(deserializer);
-    return SoundSettings(volume: var_volume, eq: var_eq, filters: var_filters);
+    var var_pitch = sse_decode_f_64(deserializer);
+    var var_speed = sse_decode_f_64(deserializer);
+    return SoundSettings(
+      volume: var_volume,
+      eq: var_eq,
+      filters: var_filters,
+      pitch: var_pitch,
+      speed: var_speed,
+    );
   }
 
   @protected
@@ -4290,6 +4300,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_64(self.volume, serializer);
     sse_encode_bool(self.eq, serializer);
     sse_encode_list_eq_filter(self.filters, serializer);
+    sse_encode_f_64(self.pitch, serializer);
+    sse_encode_f_64(self.speed, serializer);
   }
 
   @protected

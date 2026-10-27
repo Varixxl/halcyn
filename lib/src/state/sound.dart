@@ -66,6 +66,21 @@ class SoundController extends ChangeNotifier {
   double bass = 0;
   double treble = 0;
 
+  /// Semitones up or down, without changing the speed.
+  double pitch = 0;
+
+  /// Times as fast, without changing the pitch.
+  double speed = 1;
+
+  /// What's heard: a slider being dragged moves [pitch] and [speed] only, since each
+  /// change starts the song again from where it is.
+  double _heardPitch = 0;
+  double _heardSpeed = 1;
+
+  static const maxPitch = 12.0;
+  static const minSpeed = 0.5;
+  static const maxSpeed = 2.0;
+
   /// What the EQ does, from the engine.
   double preampDb = 0;
   List<double> curve = const [];
@@ -119,6 +134,12 @@ class SoundController extends ChangeNotifier {
       if (bands.length != 10) bands = List.filled(10, 0);
       bass = (saved['bass'] as num? ?? 0).toDouble();
       treble = (saved['treble'] as num? ?? 0).toDouble();
+      pitch = _heardPitch = _pitchStep(
+        (saved['pitch'] as num? ?? 0).toDouble(),
+      );
+      speed = _heardSpeed = _speedStep(
+        (saved['speed'] as num? ?? 1).toDouble(),
+      );
     } on Object {
       // First run: full volume, EQ off.
     }
@@ -173,6 +194,40 @@ class SoundController extends ChangeNotifier {
     _apply();
   }
 
+  /// [live] false while a slider is dragged: shown, and heard once it's let go.
+  void setPitch(double semitones, {bool live = true}) {
+    pitch = _pitchStep(semitones);
+    live ? _hear() : notifyListeners();
+  }
+
+  /// [live] as for [setPitch].
+  void setSpeed(double times, {bool live = true}) {
+    speed = _speedStep(times);
+    live ? _hear() : notifyListeners();
+  }
+
+  /// Both as shown, so a button pressed mid-drag can't leave one behind.
+  void _hear() {
+    _heardPitch = pitch;
+    _heardSpeed = speed;
+    _apply();
+  }
+
+  bool get tempoChanged => pitch != 0 || speed != 1;
+
+  /// Pitch and speed back to normal.
+  void resetTempo() {
+    pitch = _heardPitch = 0;
+    speed = _heardSpeed = 1;
+    _apply();
+  }
+
+  static double _pitchStep(double semitones) =>
+      (semitones.clamp(-maxPitch, maxPitch) * 2).round() / 2;
+
+  static double _speedStep(double times) =>
+      (times.clamp(minSpeed, maxSpeed) * 20).round() / 20;
+
   /// Bands, bass and treble back to flat; the headphone correction stays.
   void reset() {
     preset = 'flat';
@@ -204,6 +259,8 @@ class SoundController extends ChangeNotifier {
         volume: volume * volume * volume,
         eq: eq,
         filters: _filters,
+        pitch: _heardPitch,
+        speed: _heardSpeed,
       ),
     );
     preampDb = info.preampDb;
@@ -226,6 +283,8 @@ class SoundController extends ChangeNotifier {
             'bands': bands,
             'bass': bass,
             'treble': treble,
+            'pitch': _heardPitch,
+            'speed': _heardSpeed,
           }),
         );
       } on Object catch (e) {

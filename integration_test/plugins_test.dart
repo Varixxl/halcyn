@@ -33,6 +33,10 @@ void main() {
     final cache = await getApplicationCacheDirectory();
     final folder = Directory('${cache.path}/plugins-test');
     if (folder.existsSync()) folder.deleteSync(recursive: true);
+    // Gone afterwards too, even if a step fails: other tests would run its plugins.
+    addTearDown(() {
+      if (folder.existsSync()) folder.deleteSync(recursive: true);
+    });
 
     await app.main(const []);
     // The desktop layout, sidebar and all, whatever size the test window opened at.
@@ -253,13 +257,17 @@ halcyn.hooks.beforePlay(({ tracks, start }) => {
     await tester.scrollUntilVisible(
       find.text('Set me'),
       200,
-      // Settings' General tab.
-      scrollable: find
-          .ancestor(
-            of: find.text('Music folders'),
-            matching: find.byType(Scrollable),
-          )
-          .first,
+      // Settings' General tab, held on to: its first heading scrolls out of it.
+      scrollable: find.byWidget(
+        tester.widget<Scrollable>(
+          find
+              .ancestor(
+                of: find.text('Halcyn account'),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        ),
+      ),
     );
     expect(find.text('Reshape settings'), findsOneWidget);
 
@@ -314,7 +322,8 @@ halcyn.hooks.beforePlay(({ tracks, start }) => {
       plugins.tabs(TabPlace.sidebar).map((p) => p.title),
       isNot(contains('Discover')),
     );
-    expect(plugins.trackActions, isEmpty);
+    // Only the bundled Play Counts' entry is left.
+    expect(plugins.trackActions.map((a) => a.title), ['Show play count']);
     await tester.runAsync(
       () => plugins.remove('io.github.varixxl.listening-diary'),
     );

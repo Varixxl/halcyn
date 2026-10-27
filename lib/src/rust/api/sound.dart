@@ -76,14 +76,27 @@ class SoundSettings {
   /// The headphone correction, the bands and the bass and treble shelves, in order.
   final List<EqFilter> filters;
 
+  /// Up or down in semitones (-12..12) without changing the speed.
+  final double pitch;
+
+  /// 0.5..2 times as fast, without changing the pitch.
+  final double speed;
+
   const SoundSettings({
     required this.volume,
     required this.eq,
     required this.filters,
+    required this.pitch,
+    required this.speed,
   });
 
   @override
-  int get hashCode => volume.hashCode ^ eq.hashCode ^ filters.hashCode;
+  int get hashCode =>
+      volume.hashCode ^
+      eq.hashCode ^
+      filters.hashCode ^
+      pitch.hashCode ^
+      speed.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -92,5 +105,7 @@ class SoundSettings {
           runtimeType == other.runtimeType &&
           volume == other.volume &&
           eq == other.eq &&
-          filters == other.filters;
+          filters == other.filters &&
+          pitch == other.pitch &&
+          speed == other.speed;
 }

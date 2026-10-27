@@ -12,6 +12,7 @@ Get the latest version from [Releases](https://github.com/Varixxl/halcyn/release
 - **Streaming:** sign in to Tidal (lossless and hi-res, with a subscription) or YouTube Music in Settings. On Linux and Windows, YouTube Music songs need [yt-dlp](https://github.com/yt-dlp/yt-dlp) installed.
 - **Halcyn account (optional):** keeps your linked services and playlists the same on every device. The service sign-ins are encrypted on your device with your password before they're uploaded; write down the recovery key it shows once, as nobody can reset the password for you.
 - **Downloads:** streamed songs download from the best-quality service you're signed in to (Tidal's FLAC before YouTube Music's AAC) into `Music/Halcyn Downloads/Artist/Album`.
+- **Pitch and speed:** in the Sound panel (the EQ button), each on its own: the pitch moves without the song speeding up, and the speed changes without the pitch moving.
 - **Discord:** shows what you're playing on your profile through the Discord app on your computer. A phone's songs show there too while you're signed in to your Halcyn account on both and Halcyn is open on the computer.
 
 ## Develop
@@ -35,4 +36,5 @@ Push a tag such as `v0.2.0`. GitHub Actions (`.github/workflows/release.yml`) bu
 ## Credits
 
 - Headphone corrections from [AutoEq](https://github.com/jaakkopasanen/AutoEq) by Jaakko Pasanen (MIT).
+- Pitch and speed: [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) by Signalsmith Audio (MIT), in `rust/vendor/signalsmith`.
 - [Inter](https://rsms.me/inter/) typeface by Rasmus Andersson (SIL Open Font License, `assets/fonts/OFL.txt`).
