@@ -75,6 +75,11 @@ Future<void> streamingImport({
 Future<List<String?>> streamingArtUrls({required List<String> paths}) =>
     RustLib.instance.api.crateApiStreamingStreamingArtUrls(paths: paths);
 
+/// How far along the streamed song at `path` is downloading, from 0 to 1; None when it
+/// isn't.
+double? streamingDownloadProgress({required String path}) =>
+    RustLib.instance.api.crateApiStreamingStreamingDownloadProgress(path: path);
+
 /// Lets the app find YouTube audio addresses itself (the phone's extractor). The function
 /// returns the address, or "" when it couldn't.
 Future<void> streamingSetYoutubeResolver({

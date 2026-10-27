@@ -136,6 +136,14 @@ pub fn streaming_art_urls(paths: Vec<String>) -> Result<Vec<Option<String>>> {
     with(|l| l.stream_art_urls(&paths))
 }
 
+/// How far along the streamed song at `path` is downloading, from 0 to 1; None when it
+/// isn't.
+#[flutter_rust_bridge::frb(sync)]
+pub fn streaming_download_progress(path: String) -> Option<f64> {
+    let (service, id) = streaming::parse(&path)?;
+    streaming::download::progress(&streaming::cache_dir(), &format!("{service}-{id}"))
+}
+
 /// Lets the app find YouTube audio addresses itself (the phone's extractor). The function
 /// returns the address, or "" when it couldn't.
 pub fn streaming_set_youtube_resolver(

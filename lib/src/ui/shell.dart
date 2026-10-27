@@ -7,6 +7,7 @@ import '../state/plugins.dart';
 import '../theme.dart';
 import 'albums_page.dart';
 import 'artists_page.dart';
+import 'downloads.dart';
 import 'places.dart';
 import 'now_playing.dart';
 import 'player_bar.dart';
@@ -320,6 +321,7 @@ class _ShellState extends State<Shell> {
                             ],
                           ),
                         ),
+                        const DownloadsBar(),
                         PlayerBar(
                           onQueue: () => _select(const Section(Place.queue)),
                         ),
@@ -328,6 +330,7 @@ class _ShellState extends State<Shell> {
                   : Column(
                       children: [
                         Expanded(child: content),
+                        const DownloadsBar(),
                         const MiniPlayer(),
                       ],
                     ),

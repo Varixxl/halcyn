@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'account.dart';
 import 'cast.dart';
+import 'downloads.dart';
 import 'plugin_view.dart';
 import 'plugins_page.dart';
 import 'streaming.dart';
@@ -258,24 +259,12 @@ class _SongDownloads extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LinearProgressIndicator(
-                      value: downloads.total == 0
-                          ? null
-                          : (downloads.done + downloads.failed) /
-                                downloads.total,
-                    ),
+                    DownloadsProgressBar(value: downloads.progress),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            'Downloading ${downloads.current?.title ?? ''} '
-                            '(${downloads.done + downloads.failed + 1} of '
-                            '${downloads.total})',
-                            style: muted,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(downloadsLabel(downloads), style: muted),
                         ),
                         TextButton(
                           onPressed: downloads.cancel,
@@ -283,6 +272,32 @@ class _SongDownloads extends StatelessWidget {
                         ),
                       ],
                     ),
+                    // Each song downloading now, with its own bar.
+                    for (final t in downloads.downloading)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Text(
+                                '${t.title} · ${t.artists.join(', ')}',
+                                style: muted,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: DownloadsProgressBar(
+                                value: downloads.progressOf(t),
+                                height: 3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               )

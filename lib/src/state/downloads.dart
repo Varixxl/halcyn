@@ -33,16 +33,43 @@ class DownloadsController extends ChangeNotifier {
 
   final _queue = <Track>[];
 
+  /// Songs downloading now, and which service's copy each is (once that's chosen).
+  final _active = <Track, String?>{};
+
   /// Of the songs queued since the queue was last empty: how many are finished
   /// (downloaded, or skipped as already here) and how many failed.
   int done = 0;
   int failed = 0;
   int skipped = 0;
-  Track? current;
   String? lastError;
+  int _saved = 0;
+  Timer? _ticker;
+  Future<void>? _adding;
 
-  int get total => done + failed + _queue.length + (current == null ? 0 : 1);
-  bool get busy => current != null || _queue.isNotEmpty;
+  /// Songs downloaded at once, as VarMusic does: each also fetches several parts at once.
+  static const atOnce = 3;
+
+  int get total => done + failed + _queue.length + _active.length;
+  bool get busy => _active.isNotEmpty || _queue.isNotEmpty;
+  Iterable<Track> get downloading => _active.keys;
+
+  /// How far along the songs downloading now are, 0 to 1 each.
+  double progressOf(Track track) {
+    final path = _active[track];
+    if (path == null) return 0;
+    try {
+      return streamingDownloadProgress(path: path) ?? 0;
+    } on Object {
+      return 0;
+    }
+  }
+
+  /// Of everything queued, how much is done, songs under way counting in part.
+  double get progress {
+    if (total == 0) return 0;
+    final partly = _active.keys.fold(0.0, (sum, t) => sum + progressOf(t));
+    return ((done + failed + partly) / total).clamp(0, 1);
+  }
 
   static String defaultFolder() {
     if (Platform.isAndroid) return '/storage/emulated/0/Music/Halcyn Downloads';
@@ -75,7 +102,10 @@ class DownloadsController extends ChangeNotifier {
 
   /// Queues the streamed songs among [tracks] (the user's own files are here already).
   void add(Iterable<Track> tracks) {
-    final queued = {for (final t in _queue) t.path, ?current?.path};
+    final queued = {
+      for (final t in _queue) t.path,
+      for (final t in _active.keys) t.path,
+    };
     final adding = [
       for (final t in tracks)
         if (isStream(t.path) && queued.add(t.path)) t,
@@ -88,40 +118,59 @@ class DownloadsController extends ChangeNotifier {
       lastError = null;
     }
     _queue.addAll(adding);
+    // The bars move between songs too.
+    _ticker ??= Timer.periodic(
+      const Duration(milliseconds: 250),
+      (_) => notifyListeners(),
+    );
+    _next();
     notifyListeners();
-    if (current == null) unawaited(_run());
   }
 
-  /// Stops after the song downloading now.
+  /// Stops after the songs downloading now.
   void cancel() {
     _queue.clear();
     notifyListeners();
   }
 
-  Future<void> _run() async {
-    var saved = 0;
-    while (_queue.isNotEmpty) {
+  void _next() {
+    while (_active.length < atOnce && _queue.isNotEmpty) {
       final track = _queue.removeAt(0);
-      current = track;
-      notifyListeners();
-      try {
-        if (await _download(track)) {
-          saved++;
-        } else {
-          skipped++;
-        }
-        done++;
-      } on Object catch (e) {
-        failed++;
-        lastError = '${track.title}: ${streamingError(e)}';
-        debugPrint('download ${track.path}: $e');
-      }
-      // Show them in the library a few at a time.
-      if (saved > 0 && saved % 10 == 0) await _addToLibrary();
+      _active[track] = null;
+      unawaited(_one(track));
     }
-    current = null;
+  }
+
+  Future<void> _one(Track track) async {
+    try {
+      if (await _download(track)) {
+        _saved++;
+      } else {
+        skipped++;
+      }
+      done++;
+    } on Object catch (e) {
+      failed++;
+      lastError = '${track.title}: ${streamingError(e)}';
+      debugPrint('download ${track.path}: $e');
+    }
+    _active.remove(track);
+    _next();
     notifyListeners();
-    if (saved > 0) await _addToLibrary();
+    if (busy) {
+      // Show them in the library a few at a time.
+      if (_saved >= 10) {
+        _saved = 0;
+        await _addToLibrary();
+      }
+      return;
+    }
+    _ticker?.cancel();
+    _ticker = null;
+    if (_saved > 0) {
+      _saved = 0;
+      await _addToLibrary();
+    }
   }
 
   /// Downloads the best copy of [track]. False when skipped: the user has the song as
@@ -129,6 +178,7 @@ class DownloadsController extends ChangeNotifier {
   Future<bool> _download(Track track) async {
     final best = await streaming.best(track);
     if (streaming.localCopy(best) != null) return false;
+    _active[track] = best.path;
     await streamingSave(
       path: best.path,
       folder: folder,
@@ -140,8 +190,22 @@ class DownloadsController extends ChangeNotifier {
     return true;
   }
 
-  /// The folder is part of the library (added the first time), and rescanned.
+  /// The folder is part of the library (added the first time), and rescanned. One at a
+  /// time: songs finish together.
   Future<void> _addToLibrary() async {
+    for (var other = _adding; other != null; other = _adding) {
+      await other;
+    }
+    final adding = _addFolder();
+    _adding = adding;
+    try {
+      await adding;
+    } finally {
+      _adding = null;
+    }
+  }
+
+  Future<void> _addFolder() async {
     // A scan under way might have passed the new files by.
     while (library.scanning != null) {
       await Future<void>.delayed(const Duration(seconds: 1));

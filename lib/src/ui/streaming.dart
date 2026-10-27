@@ -11,6 +11,7 @@ import '../rust/api/library.dart';
 import '../rust/api/streaming.dart';
 import '../state/streaming.dart';
 import '../theme.dart';
+import 'downloads.dart';
 import 'slate.dart';
 import 'track_list.dart';
 import 'widgets.dart';
@@ -1195,7 +1196,7 @@ class DownloadButton extends StatelessWidget {
       listenable: downloads,
       builder: (context, _) {
         final streamed = tracks.where((t) => isStream(t.path)).toList();
-        return OutlinedButton.icon(
+        final button = OutlinedButton.icon(
           onPressed: streamed.isEmpty
               ? null
               : () {
@@ -1208,12 +1209,17 @@ class DownloadButton extends StatelessWidget {
                   );
                 },
           icon: const Icon(Icons.download_rounded),
-          label: Text(
-            downloads.busy
-                ? 'Downloading ${downloads.done + downloads.failed + 1} of '
-                      '${downloads.total}'
-                : 'Download',
-          ),
+          label: Text(downloads.busy ? downloadsLabel(downloads) : 'Download'),
+        );
+        if (!downloads.busy) return button;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            button,
+            const SizedBox(height: 6),
+            DownloadsProgressBar(value: downloads.progress, height: 3),
+          ],
         );
       },
     );
