@@ -45,6 +45,8 @@ Future<void> main(List<String> args) async {
   await libraryOpen(dataDir: data.path, cacheDir: cache.path);
   await streamingInit(dataDir: data.path, cacheDir: cache.path);
   if (Platform.isAndroid) {
+    // The app draws under Android's status and navigation bars; the dock pads for them.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     // YouTube's audio addresses come from NewPipe's extractor, in the app.
     const android = MethodChannel('halcyn/android');
     await streamingSetYoutubeResolver(

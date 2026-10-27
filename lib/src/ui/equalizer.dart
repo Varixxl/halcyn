@@ -124,29 +124,43 @@ class _SoundPanel extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 12, 0),
-              child: Row(
-                children: [
-                  Text('Sound', style: theme.textTheme.titleLarge),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: VolumeSlider(width: 160),
-                    ),
-                  ),
-                  Text(
-                    'Equalizer',
-                    style: TextStyle(color: Palette.textMuted, fontSize: 13),
-                  ),
-                  const SizedBox(width: 8),
-                  Switch(value: sound.eq, onChanged: sound.setEq),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: 'Close',
-                  ),
-                ],
+              // A phone: a shorter slider, and the switch without its label.
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final narrow = box.maxWidth < 520;
+                  return Row(
+                    children: [
+                      Text('Sound', style: theme.textTheme.titleLarge),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: VolumeSlider(width: narrow ? 90 : 160),
+                        ),
+                      ),
+                      if (!narrow) ...[
+                        Text(
+                          'Equalizer',
+                          style: TextStyle(
+                            color: Palette.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Tooltip(
+                        message: 'Equalizer',
+                        child: Switch(value: sound.eq, onChanged: sound.setEq),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             TabBar(

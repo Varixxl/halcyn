@@ -9,7 +9,9 @@ import 'albums_page.dart';
 import 'artists_page.dart';
 import 'downloads.dart';
 import 'places.dart';
+import 'equalizer.dart';
 import 'now_playing.dart';
+import 'phone_dock.dart';
 import 'player_bar.dart';
 import 'plugin_view.dart';
 import 'playlists_page.dart';
@@ -24,17 +26,9 @@ import 'songs_page.dart';
 import 'track_list.dart';
 import 'widgets.dart';
 
-/// A phone tab.
-typedef _Tab = ({
-  IconData icon,
-  IconData selected,
-  String label,
-  VoidCallback open,
-  bool Function() shown,
-});
-
-/// Plugins' tabs in the phone's bottom bar, at most.
-const _maxPluginTabs = 2;
+/// Buttons in the phone's dock, "Everywhere" included; plugins' main tabs fill what's
+/// left after the built-in ones.
+const _dockButtons = 5;
 
 /// The sidebar (or, on a phone, the tabs), the page area with its own navigator so
 /// album and artist pages open inside it, and the docked player.
@@ -290,100 +284,102 @@ class _ShellState extends State<Shell> {
         },
         child: Focus(
           autofocus: true,
-          child: Scaffold(
-            body: SafeArea(
-              bottom: false,
-              child: wide
-                  ? Column(
-                      children: [
-                        Expanded(
-                          child: Stack(
-                            children: [
-                              Row(
-                                children: [
-                                  Sidebar(
-                                    section: _section.value,
-                                    onSelect: _select,
-                                    search: plugins.isHidden('search')
-                                        ? null
-                                        : _searchField(global: true),
-                                  ),
-                                  Expanded(
-                                    child: NowPlayingCardInset(child: content),
-                                  ),
-                                ],
-                              ),
-                              const Positioned(
-                                right: 16,
-                                bottom: 12,
-                                child: NowPlayingCard(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const DownloadsBar(),
-                        PlayerBar(
-                          onQueue: () => _select(const Section(Place.queue)),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        Expanded(child: content),
-                        const DownloadsBar(),
-                        const MiniPlayer(),
-                      ],
+          // Android's bars are see-through, over the dock and the background.
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value:
+                (Palette.theme.dark
+                        ? SystemUiOverlayStyle.light
+                        : SystemUiOverlayStyle.dark)
+                    .copyWith(
+                      statusBarColor: Colors.transparent,
+                      systemNavigationBarColor: Colors.transparent,
+                      systemNavigationBarDividerColor: Colors.transparent,
+                      systemNavigationBarContrastEnforced: false,
                     ),
-            ),
-            bottomNavigationBar: wide
-                ? null
-                : ListenableBuilder(
-                    listenable: Listenable.merge([
-                      plugins,
-                      AppScope.of(context).streaming,
-                    ]),
-                    builder: (context, _) {
-                      final tabs = _phoneTabs(plugins);
-                      final selected = tabs.indexWhere((t) => t.shown());
-                      return NavigationBar(
-                        selectedIndex: selected >= 0
-                            ? selected
-                            : tabs.indexWhere((t) => t.label == 'Library'),
-                        onDestinationSelected: (i) => tabs[i].open(),
-                        destinations: [
-                          for (final t in tabs)
-                            NavigationDestination(
-                              icon: Icon(t.icon),
-                              selectedIcon: Icon(t.selected),
-                              label: t.label,
+            child: Scaffold(
+              body: SafeArea(
+                bottom: false,
+                child: wide
+                    ? Column(
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                Row(
+                                  children: [
+                                    Sidebar(
+                                      section: _section.value,
+                                      onSelect: _select,
+                                      search: plugins.isHidden('search')
+                                          ? null
+                                          : _searchField(global: true),
+                                    ),
+                                    Expanded(
+                                      child: NowPlayingCardInset(
+                                        child: content,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Positioned(
+                                  right: 16,
+                                  bottom: 12,
+                                  child: NowPlayingCard(),
+                                ),
+                              ],
                             ),
+                          ),
+                          const DownloadsBar(),
+                          PlayerBar(
+                            onQueue: () => _select(const Section(Place.queue)),
+                          ),
                         ],
-                      );
-                    },
-                  ),
+                      )
+                    : Column(
+                        children: [
+                          Expanded(child: content),
+                          const DownloadsBar(),
+                          ListenableBuilder(
+                            listenable: Listenable.merge([
+                              plugins,
+                              AppScope.of(context).streaming,
+                            ]),
+                            builder: (context, _) => PhoneDock(
+                              tabs: _phoneTabs(plugins),
+                              everywhere: (
+                                icon: Icons.apps_rounded,
+                                selected: Icons.apps_rounded,
+                                label: 'More',
+                                open: () => showEverywhere(
+                                  context,
+                                  groups: _everywhere(plugins),
+                                ),
+                                shown: () => false,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// The phone's bottom bar: Home (with a streaming service linked), Library, Search,
-  /// Playlists, plugins' main tabs, Settings.
-  /// Library (first) is selected when no other tab is.
-  List<_Tab> _phoneTabs(PluginManager plugins) {
+  /// The phone's dock: Home (with a streaming service linked), Library, Search,
+  /// Playlists, and plugins' main tabs while there's room; "More" has the rest.
+  List<DockTab> _phoneTabs(PluginManager plugins) {
     final place = _section.value.place;
-    final library = [
-      for (final (tab, p) in [
-        ('songs', Place.songs),
-        ('albums', Place.albums),
-        ('artists', Place.artists),
-        ('queue', Place.queue),
-      ])
-        if (!plugins.isHidden(tab)) p,
+    final library = _libraryPlaces(plugins);
+    final libraryTabs = [
+      ...plugins.tabs(TabPlace.library),
+      ...plugins.tabs(TabPlace.sidebar),
     ];
     final playlists =
         !plugins.isHidden('playlists') || !plugins.isHidden('smartPlaylists');
-    return [
+    final tabs = <DockTab>[
       if (AppScope.of(context).streaming.linked)
         (
           icon: Icons.home_outlined,
@@ -397,12 +393,16 @@ class _ShellState extends State<Shell> {
         selected: Icons.library_music_rounded,
         label: 'Library',
         open: () => _select(Section(library.firstOrNull ?? Place.songs)),
-        shown: () => false,
+        shown: () =>
+            !_searching &&
+            (library.contains(place) ||
+                (place == Place.pluginPage &&
+                    libraryTabs.any((t) => t.key == _section.value.playlist))),
       ),
       if (!plugins.isHidden('search'))
         (
           icon: Icons.search_rounded,
-          selected: Icons.search_rounded,
+          selected: Icons.saved_search_rounded,
           label: 'Search',
           open: () => _focusGlobal(phone: true),
           shown: () => place == Place.search || _searching,
@@ -418,19 +418,154 @@ class _ShellState extends State<Shell> {
               place == Place.playlist ||
               place.smart,
         ),
-      for (final t in plugins.tabs(TabPlace.main).take(_maxPluginTabs))
+    ];
+    final room = _dockButtons - 1 - tabs.length;
+    return [
+      ...tabs,
+      for (final t in plugins.tabs(TabPlace.main).take(room.clamp(0, 9)))
         _pluginTab(t),
+    ];
+  }
+
+  /// Songs, Albums, Artists and Queue, less those a plugin hides.
+  List<Place> _libraryPlaces(PluginManager plugins) => [
+    for (final (tab, p) in [
+      ('songs', Place.songs),
+      ('albums', Place.albums),
+      ('artists', Place.artists),
+      ('queue', Place.queue),
+    ])
+      if (!plugins.isHidden(tab)) p,
+  ];
+
+  /// The phone's "More" sheet: every page there is, grouped.
+  List<(String, List<DockTab>)> _everywhere(PluginManager plugins) {
+    final scope = AppScope.of(context);
+    final section = _section.value;
+    DockTab to(Section s, IconData icon, IconData selected, String label) => (
+      icon: icon,
+      selected: selected,
+      label: label,
+      open: () => _select(s),
+      shown: () => !_searching && _section.value == s,
+    );
+    final loaded = scope.player.current != null;
+    return [
       (
-        icon: Icons.settings_outlined,
-        selected: Icons.settings_rounded,
-        label: 'Settings',
-        open: () => _select(const Section(Place.settings)),
-        shown: () => place == Place.settings || place == Place.plugins,
+        'Library',
+        [
+          for (final p in _libraryPlaces(plugins))
+            to(
+              Section(p),
+              switch (p) {
+                Place.songs => Icons.music_note_outlined,
+                Place.albums => Icons.album_outlined,
+                Place.artists => Icons.person_outline_rounded,
+                _ => Icons.format_list_numbered_rounded,
+              },
+              switch (p) {
+                Place.songs => Icons.music_note_rounded,
+                Place.albums => Icons.album_rounded,
+                Place.artists => Icons.person_rounded,
+                _ => Icons.format_list_numbered_rounded,
+              },
+              plugins.replacement(p.name)?.title ??
+                  switch (p) {
+                    Place.songs => 'Songs',
+                    Place.albums => 'Albums',
+                    Place.artists => 'Artists',
+                    _ => 'Queue',
+                  },
+            ),
+          for (final t in [
+            ...plugins.tabs(TabPlace.library),
+            ...plugins.tabs(TabPlace.sidebar),
+          ])
+            _pluginTab(t),
+        ],
+      ),
+      (
+        'Halcyn',
+        [
+          if (loaded) ...[
+            (
+              icon: Icons.graphic_eq_rounded,
+              selected: Icons.graphic_eq_rounded,
+              label: 'Playing',
+              open: () => openNowPlaying(context),
+              shown: () => false,
+            ),
+            (
+              icon: Icons.lyrics_outlined,
+              selected: Icons.lyrics_rounded,
+              label: 'Lyrics',
+              open: () =>
+                  openNowPlaying(context, panel: NowPlayingPanel.lyrics),
+              shown: () => false,
+            ),
+          ],
+          if (!scope.player.casting)
+            (
+              icon: Icons.tune_rounded,
+              selected: Icons.tune_rounded,
+              label: 'Sound',
+              open: () => openSound(context),
+              shown: () => false,
+            ),
+          to(
+            const Section(Place.plugins),
+            Icons.extension_outlined,
+            Icons.extension_rounded,
+            'Plugins',
+          ),
+          to(
+            const Section(Place.settings),
+            Icons.settings_outlined,
+            Icons.settings_rounded,
+            'Settings',
+          ),
+        ],
+      ),
+      (
+        'Pages',
+        [
+          if (scope.streaming.linked)
+            to(
+              const Section(Place.home),
+              Icons.home_outlined,
+              Icons.home_rounded,
+              'Home',
+            ),
+          if (!plugins.isHidden('search'))
+            (
+              icon: Icons.search_rounded,
+              selected: Icons.saved_search_rounded,
+              label: 'Search',
+              open: () => _focusGlobal(phone: true),
+              shown: () => section.place == Place.search || _searching,
+            ),
+          for (final t in plugins.tabs(TabPlace.main)) _pluginTab(t),
+        ],
+      ),
+      (
+        'Playlists',
+        [
+          if (!plugins.isHidden('playlists'))
+            to(
+              const Section(Place.playlists),
+              Icons.queue_music_outlined,
+              Icons.queue_music_rounded,
+              'All playlists',
+            ),
+          if (!plugins.isHidden('smartPlaylists'))
+            for (final s in SmartList.all)
+              to(Section(s.place), s.icon, s.icon, s.name),
+        ],
       ),
     ];
   }
 
-  _Tab _pluginTab(PluginPage t) => (
+  DockTab _pluginTab(PluginPage t) => (
     icon: pluginIcon(t.icon),
     selected: pluginIcon(t.icon),
     label: t.title,

@@ -93,61 +93,6 @@ class PlayerBar extends StatelessWidget {
   }
 }
 
-/// The phone bar above the navigation: cover, title, play/pause, and a progress line.
-class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final player = AppScope.of(context).player;
-    return ListenableBuilder(
-      listenable: player,
-      builder: (context, _) {
-        final track = player.current;
-        return AnimatedSize(
-          duration: Motion.medium,
-          curve: Motion.curve,
-          child: track == null
-              ? const SizedBox(width: double.infinity)
-              : Material(
-                  color: Palette.surfaceHigh.withValues(alpha: 0.6),
-                  child: InkWell(
-                    onTap: () => openNowPlaying(context),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                          child: Row(
-                            children: [
-                              Hero(
-                                tag: nowPlayingArtTag,
-                                child: Artwork(art: track.art, size: 44),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _Titles(
-                                  title: track.title,
-                                  artists: track.artists,
-                                ),
-                              ),
-                              if (player.casting)
-                                const CastButton(compact: true),
-                              const PlayPauseButton(size: 44, filled: false),
-                            ],
-                          ),
-                        ),
-                        const _ProgressLine(),
-                      ],
-                    ),
-                  ),
-                ),
-        );
-      },
-    );
-  }
-}
-
 /// Shrinks the window into the mini player.
 class MiniModeButton extends StatelessWidget {
   const MiniModeButton({super.key});
@@ -161,62 +106,6 @@ class MiniModeButton extends StatelessWidget {
       iconSize: 20,
       color: Palette.textMuted,
       tooltip: 'Mini player (Ctrl+M)',
-    );
-  }
-}
-
-class _Titles extends StatelessWidget {
-  const _Titles({required this.title, required this.artists});
-
-  final String title;
-  final List<String> artists;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          artists.join(', '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(color: Palette.textMuted),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProgressLine extends StatelessWidget {
-  const _ProgressLine();
-
-  @override
-  Widget build(BuildContext context) {
-    final player = AppScope.of(context).player;
-    return RepaintBoundary(
-      child: ListenableBuilder(
-        listenable: Listenable.merge([player, player.position]),
-        builder: (context, _) {
-          final duration = player.current?.durationSecs ?? 0;
-          return LinearProgressIndicator(
-            value: duration > 0
-                ? (player.position.value / duration).clamp(0.0, 1.0)
-                : 0,
-            minHeight: 2,
-            backgroundColor: Colors.transparent,
-          );
-        },
-      ),
     );
   }
 }
