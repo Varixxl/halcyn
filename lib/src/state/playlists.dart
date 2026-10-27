@@ -42,6 +42,26 @@ class PlaylistsController extends ChangeNotifier {
     libraryDeletePlaylist(id: playlist.id);
   }
 
+  /// The playlist with a new name and songs (from another device).
+  Playlist replace(
+    Playlist playlist, {
+    required String name,
+    required List<String> paths,
+  }) {
+    final updated = Playlist(
+      id: playlist.id,
+      name: name,
+      paths: paths,
+      source: playlist.source,
+    );
+    _replace(updated);
+    if (name != playlist.name) {
+      libraryRenamePlaylist(id: playlist.id, name: name);
+    }
+    librarySetPlaylistTracks(id: playlist.id, paths: paths);
+    return updated;
+  }
+
   void add(Playlist playlist, List<String> paths) =>
       _setPaths(playlist, [...?byId(playlist.id)?.paths, ...paths]);
 

@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../rust/api/library.dart';
 import 'library.dart';
 import 'player.dart';
+import 'streaming.dart' show bareTitle, isStream;
 
 /// An HTTP GET: the status and body.
 typedef Get = Future<(int, Uint8List)> Function(Uri url);
@@ -89,7 +90,97 @@ class Fetcher extends ChangeNotifier {
   /// Looks for what's missing a little after startup, and after each rescan.
   void start() {
     library.addListener(_libraryChanged);
+    player.addListener(_playerChanged);
     _later(const Duration(seconds: 5));
+  }
+
+  String? _playing;
+
+  /// A song starts: its lyrics now, if it has none yet (streamed songs, songs not looked
+  /// for yet), so they're there when the lyrics are opened.
+  void _playerChanged() {
+    final track = player.current;
+    if (track == null || track.path == _playing) return;
+    _playing = track.path;
+    if (!isStream(track.path) && File(lyricsPath(track.path)).existsSync()) {
+      return;
+    }
+    unawaited(lyricsNow(track));
+  }
+
+  /// Lookups under way, and songs LRCLIB didn't have, while the app runs.
+  final _asked = <String, Future<String?>>{};
+
+  /// The song's downloaded lyrics, looked up on LRCLIB first if there are none (once
+  /// per song while the app runs). Reading them counts as using them: see
+  /// [clearUnusedLyrics].
+  Future<String?> lyricsNow(Track track) async {
+    final file = downloadedLyrics(track.path);
+    if (file == null) return null;
+    try {
+      final text = await file.readAsString();
+      await touchLyrics(file);
+      return text;
+    } on Object {
+      // Not downloaded yet.
+    }
+    if (!online || !lyrics || track.artists.isEmpty) return null;
+    return _asked[track.path] ??= _download(track, file);
+  }
+
+  Future<String?> _download(Track track, File file) async {
+    try {
+      final text = await _lookUpLyrics(track, search: true);
+      _lyricsTried[track.path] = _now();
+      if (text == null) return null;
+      await file.parent.create(recursive: true);
+      await file.writeAsString(text);
+      _asked.remove(track.path);
+      library.addLyrics({track.path});
+      unawaited(_save());
+      return text;
+    } on Object catch (e) {
+      // Offline or LRCLIB trouble: ask again next time it plays.
+      _asked.remove(track.path);
+      debugPrint('fetcher: lyrics for ${track.path}: $e');
+      return null;
+    }
+  }
+
+  /// Deletes the downloaded lyrics that haven't been shown or played for [unused]
+  /// (never `.lrc` files beside the music). Returns how many went.
+  Future<int> clearUnusedLyrics([
+    Duration unused = const Duration(days: 7),
+  ]) async {
+    final dir = downloadedLyricsDir;
+    if (dir == null || !await dir.exists()) return 0;
+    final before = DateTime.now().subtract(unused);
+    final gone = <String>{};
+    await for (final entry in dir.list()) {
+      if (entry is! File || !entry.path.endsWith('.lrc')) continue;
+      try {
+        if ((await entry.lastModified()).isBefore(before)) {
+          await entry.delete();
+          gone.add(entry.uri.pathSegments.last);
+        }
+      } on Object {
+        // Gone already, or in use.
+      }
+    }
+    if (gone.isEmpty) return 0;
+    // Not downloaded again in the background for a while; playing them still does.
+    final paths = [
+      for (final t in [...library.tracks, ...library.streams.values])
+        if (gone.contains(downloadedLyrics(t.path)!.uri.pathSegments.last))
+          t.path,
+    ];
+    for (final path in paths) {
+      _lyricsTried[path] = _now();
+      _asked.remove(path);
+    }
+    library.removeLyrics(paths.toSet());
+    await _save();
+    return gone.length;
   }
 
   void setArt(bool on) {
@@ -238,28 +329,14 @@ class Fetcher extends ChangeNotifier {
     for (final (i, t) in tracks.indexed) {
       if (!lyrics) break;
       _setStatus('Looking for lyrics: ${i + 1} of ${tracks.length}');
-      final (status, body) = await _fetch(
-        Uri.https('lrclib.net', '/api/get', {
-          'artist_name': t.artists.first,
-          'track_name': t.title,
-          'album_name': ?t.album,
-          'duration': '${t.durationSecs.round()}',
-        }),
-      );
-      if (status == 200) {
-        final json = jsonDecode(utf8.decode(body)) as Map;
-        final text = switch (json) {
-          {'syncedLyrics': final String s} when s.trim().isNotEmpty => s,
-          {'plainLyrics': final String s} when s.trim().isNotEmpty => s,
-          _ => null,
-        };
-        if (text != null) {
+      try {
+        if (await _lookUpLyrics(t) case final text?) {
           await downloadedLyrics(t.path)!.writeAsString(text);
           got.add(t.path);
         }
-      } else if (status >= 500 || status == 429) {
+      } on _Busy {
         // A hiccup: this song is asked about again next time. Several in a row: later.
-        if (++failures >= 3) throw HttpException('LRCLIB answered $status');
+        if (++failures >= 3) rethrow;
         continue;
       }
       failures = 0;
@@ -271,6 +348,45 @@ class Fetcher extends ChangeNotifier {
       if (i % 20 == 19) await _save();
     }
     if (got.isNotEmpty) library.addLyrics(got);
+  }
+
+  /// The song's lyrics on LRCLIB (synced if it has them), or null. With [search], a song
+  /// it doesn't know by exactly these tags is searched for (streamed songs' tags differ
+  /// from the ones LRCLIB has more often). Throws [_Busy] when LRCLIB is struggling.
+  Future<String?> _lookUpLyrics(Track t, {bool search = false}) async {
+    String? lyricsOf(Object? json) => switch (json) {
+      {'syncedLyrics': final String s} when s.trim().isNotEmpty => s,
+      {'plainLyrics': final String s} when s.trim().isNotEmpty => s,
+      _ => null,
+    };
+    final (status, body) = await _fetch(
+      Uri.https('lrclib.net', '/api/get', {
+        'artist_name': t.artists.first,
+        'track_name': t.title,
+        'album_name': ?t.album,
+        'duration': '${t.durationSecs.round()}',
+      }),
+    );
+    if (status >= 500 || status == 429) throw _Busy(status);
+    if (status == 200) return lyricsOf(jsonDecode(utf8.decode(body)));
+    if (!search) return null;
+    final (found, results) = await _fetch(
+      Uri.https('lrclib.net', '/api/search', {
+        'artist_name': t.artists.first,
+        'track_name': bareTitle(t.title),
+      }),
+    );
+    if (found >= 500 || found == 429) throw _Busy(found);
+    if (found != 200) return null;
+    // The same length, give or take a few seconds: the same recording.
+    final close = [
+      for (final r in (jsonDecode(utf8.decode(results)) as List?) ?? const [])
+        if (r case {'duration': final num d}
+            when (d - t.durationSecs).abs() <= 3)
+          r,
+    ];
+    final synced = close.where((r) => r['syncedLyrics'] is String).firstOrNull;
+    return lyricsOf(synced ?? close.firstOrNull);
   }
 
   /// The library again, with the new covers, and the queue's copies of its tracks.
@@ -321,7 +437,22 @@ class Fetcher extends ChangeNotifier {
   void dispose() {
     _soon?.cancel();
     library.removeListener(_libraryChanged);
+    player.removeListener(_playerChanged);
     _http.close(force: true);
     super.dispose();
+  }
+}
+
+/// LRCLIB answered 429 or 5xx.
+class _Busy extends HttpException {
+  _Busy(int status) : super('LRCLIB answered $status');
+}
+
+/// Marks downloaded lyrics as used just now (see [Fetcher.clearUnusedLyrics]).
+Future<void> touchLyrics(File file) async {
+  try {
+    await file.setLastModified(DateTime.now());
+  } on Object {
+    // Read-only, or gone: it'll just be cleared sooner.
   }
 }

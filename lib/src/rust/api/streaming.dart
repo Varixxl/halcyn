@@ -55,6 +55,26 @@ Future<String> streamingYoutubeSignInFromBrowser({required String browser}) =>
 Future<void> streamingYoutubeSignOut() =>
     RustLib.instance.api.crateApiStreamingStreamingYoutubeSignOut();
 
+/// The service's sign-in as JSON (for the Halcyn account's vault), or None when signed out.
+Future<String?> streamingExport({required String serviceName}) => RustLib
+    .instance
+    .api
+    .crateApiStreamingStreamingExport(serviceName: serviceName);
+
+/// Signs in with a sign-in from `streaming_export` on another device.
+Future<void> streamingImport({
+  required String serviceName,
+  required String saved,
+}) => RustLib.instance.api.crateApiStreamingStreamingImport(
+  serviceName: serviceName,
+  saved: saved,
+);
+
+/// The cover addresses of remembered streamed songs (None for a song without one), so a
+/// playlist synced to another device can bring them along.
+Future<List<String?>> streamingArtUrls({required List<String> paths}) =>
+    RustLib.instance.api.crateApiStreamingStreamingArtUrls(paths: paths);
+
 /// Lets the app find YouTube audio addresses itself (the phone's extractor). The function
 /// returns the address, or "" when it couldn't.
 Future<void> streamingSetYoutubeResolver({
@@ -114,6 +134,25 @@ Future<List<Track>> streamingRemember({required List<RemoteTrack> tracks}) =>
 /// Downloads the whole streamed song at `path` (for casting it) and returns the file.
 Future<String> streamingDownload({required String path}) =>
     RustLib.instance.api.crateApiStreamingStreamingDownload(path: path);
+
+/// Saves the streamed song at `path` in `folder` as `Artist/Album/Title.flac` (or `.m4a`)
+/// with its tags and cover (`art`, from the art cache) written in. Returns the file; a song
+/// already saved there is kept as it is.
+Future<String> streamingSave({
+  required String path,
+  required String folder,
+  required String title,
+  required List<String> artists,
+  String? album,
+  String? art,
+}) => RustLib.instance.api.crateApiStreamingStreamingSave(
+  path: path,
+  folder: folder,
+  title: title,
+  artists: artists,
+  album: album,
+  art: art,
+);
 
 /// Every streamed song remembered.
 Future<List<Track>> streamingTracks() =>

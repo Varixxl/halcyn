@@ -510,6 +510,14 @@ class _Block extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                trailing: Text(
+                  [
+                    if (scope.plugins.showTrackPlays)
+                      '${formatPlays(scope.library.plays(t))} ${scope.library.plays(t) == 1 ? 'play' : 'plays'}',
+                    clock(t.durationSecs),
+                  ].join(' · '),
+                  style: muted,
+                ),
                 onTap: () => scope.player.playTracks(tracks, i),
               ),
           ],

@@ -411,13 +411,16 @@ class _RemoteListPageState extends State<RemoteListPage> {
                                           tracks.isEmpty || _importing != null
                                           ? null
                                           : _import,
-                                      icon: const Icon(Icons.download_rounded),
+                                      icon: const Icon(
+                                        Icons.playlist_add_rounded,
+                                      ),
                                       label: Text(
                                         _importing == null
                                             ? 'Import to Halcyn'
                                             : 'Importing ${(_importing! * 100).round()}%',
                                       ),
                                     ),
+                                    DownloadButton(tracks: tracks),
                                   ],
                                 ),
                               ],
@@ -1177,4 +1180,42 @@ class _SignInPageState extends State<_SignInPage> {
     appBar: AppBar(title: Text(widget.title)),
     body: WebViewWidget(controller: _web),
   );
+}
+
+/// Downloads [tracks] (see `DownloadsController`), showing how far it's got.
+class DownloadButton extends StatelessWidget {
+  const DownloadButton({super.key, required this.tracks});
+
+  final List<Track> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    final downloads = AppScope.of(context).downloads;
+    return ListenableBuilder(
+      listenable: downloads,
+      builder: (context, _) {
+        final streamed = tracks.where((t) => isStream(t.path)).toList();
+        return OutlinedButton.icon(
+          onPressed: streamed.isEmpty
+              ? null
+              : () {
+                  downloads.add(streamed);
+                  _tell(
+                    context,
+                    'Downloading ${streamed.length} '
+                    '${streamed.length == 1 ? 'song' : 'songs'} at the best '
+                    'quality your services have, into ${downloads.folder}',
+                  );
+                },
+          icon: const Icon(Icons.download_rounded),
+          label: Text(
+            downloads.busy
+                ? 'Downloading ${downloads.done + downloads.failed + 1} of '
+                      '${downloads.total}'
+                : 'Download',
+          ),
+        );
+      },
+    );
+  }
 }

@@ -43,7 +43,7 @@ well). Installing a file with an id that's already installed updates that plugin
 |-------------|--------------------------------------------------------------------------|
 | `library`   | `halcyn.library.*`, `halcyn.playlists.*` and the `libraryChanged` event  |
 | `player`    | `halcyn.player.*`, `halcyn.hooks.*` and the playback events               |
-| `interface` | hide or replace Halcyn's own tabs, add themes and keyboard shortcuts      |
+| `interface` | hide or replace Halcyn's own tabs, add themes, keyboard shortcuts, show track play counts |
 | `files`     | `halcyn.files.*`: any file Halcyn can reach                               |
 | `network`   | `halcyn.http.*`: any website                                              |
 
@@ -120,6 +120,7 @@ await halcyn.ui.hide(['albums', 'smartPlaylists'])     // and ui.show(...)
 await halcyn.ui.replace('songs', { title: 'Library', render })
 await halcyn.ui.addTheme({ ...sameJsonAsAssetsThemes })    // in the theme picker
 await halcyn.ui.addShortcut({ keys: 'ctrl+shift+k', run }) // desktop keyboards
+await halcyn.ui.showTrackPlays(true)                       // show play counts next to tracks across the UI
 
 // Saved values (JSON, up to 1 MB per plugin, kept until it's removed)
 await halcyn.storage.get('key')

@@ -76,6 +76,11 @@ pub fn sign_in(cookie: &str) -> Result<String> {
         bail!("those cookies aren't from a signed-in YouTube Music (no SAPISID)");
     }
     let name = account_name(&cookie)?;
+    save(cookie, Some(name.clone()))?;
+    Ok(name)
+}
+
+fn save(cookie: String, name: Option<String>) -> Result<()> {
     let mut state = STATE.lock().unwrap();
     if let Some(file) = &state.file {
         let tmp = file.with_extension("json.tmp");
@@ -88,8 +93,21 @@ pub fn sign_in(cookie: &str) -> Result<String> {
         std::fs::rename(&tmp, file)?;
     }
     state.cookie = Some(cookie);
-    state.name = Some(name.clone());
-    Ok(name)
+    state.name = name;
+    Ok(())
+}
+
+/// The sign-in as JSON, for the Halcyn account's vault.
+pub fn export() -> Option<String> {
+    let state = STATE.lock().unwrap();
+    state.cookie.as_ref().map(|c| json!({ "cookie": c, "name": state.name }).to_string())
+}
+
+/// Signs in with a sign-in exported on another device.
+pub fn import(saved: &str) -> Result<()> {
+    let saved: Value = serde_json::from_str(saved)?;
+    let cookie = saved.s("cookie").filter(|c| sapisid(c).is_some());
+    save(cookie.ok_or_else(|| anyhow!("that isn't a YouTube Music sign-in"))?, saved.s("name"))
 }
 
 /// Signs in with the cookies of a browser on this computer (yt-dlp reads them).

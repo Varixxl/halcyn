@@ -10,7 +10,6 @@ import '../rust/api/streaming.dart';
 import '../state/library.dart';
 import '../state/player.dart';
 import '../state/spectrum.dart';
-import '../state/streaming.dart';
 import 'protocol.dart';
 
 /// A Halcyn that can be cast to.

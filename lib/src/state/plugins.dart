@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../rust/api/library.dart';
 import '../rust/api/player.dart';
@@ -268,6 +269,7 @@ class InstalledPlugin {
   final themes = <HalcynTheme>[];
   final beforePlay = <int>[];
   final events = <String>{};
+  bool showTrackPlays = false;
 
   void clearAdded() {
     commands.clear();
@@ -281,6 +283,7 @@ class InstalledPlugin {
     themes.clear();
     beforePlay.clear();
     events.clear();
+    showTrackPlays = false;
   }
 }
 
@@ -401,6 +404,7 @@ class PluginManager extends ChangeNotifier {
   }
 
   bool isHidden(String tab) => _live.any((p) => p.hidden.contains(tab));
+  bool get showTrackPlays => _live.any((p) => p.showTrackPlays);
 
   /// Any page or tab by key, while its plugin runs.
   PluginPage? page(int key) {
@@ -424,6 +428,21 @@ class PluginManager extends ChangeNotifier {
     player.position.addListener(_positionChanged);
     library.addListener(_libraryChanged);
     await dir.create(recursive: true);
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      for (final key in manifest.listAssets()) {
+        if (key.startsWith('assets/plugins/') && key.endsWith('.js')) {
+          final source = await rootBundle.loadString(key);
+          final pManifest = PluginManifest.parse(source);
+          final file = _source(pManifest.id);
+          if (!await file.exists()) {
+            await file.writeAsString(source);
+          }
+        }
+      }
+    } on Object catch (e) {
+      debugPrint('Bundling assets/plugins: $e');
+    }
     Map<String, Object?> enabled = const {};
     try {
       enabled =
@@ -741,6 +760,7 @@ class PluginManager extends ChangeNotifier {
     'ui.show': PluginPermission.interface,
     'ui.addTheme': PluginPermission.interface,
     'ui.addShortcut': PluginPermission.interface,
+    'ui.showTrackPlays': PluginPermission.interface,
   };
 
   Future<Object?> _answer(
@@ -966,6 +986,9 @@ class PluginManager extends ChangeNotifier {
             PluginAction(id, text('keys'), _handler(args), keys: text('keys')),
           ),
         );
+      case 'ui.showTrackPlays':
+        final show = args['show'] != false;
+        return added(() => plugin.showTrackPlays = show);
       case 'ui.navigate':
         navigation.add(text('target'));
         return null;

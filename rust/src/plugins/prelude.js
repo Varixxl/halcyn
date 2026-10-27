@@ -195,6 +195,8 @@
       /** Needs "interface". e.g. "ctrl+shift+k" (desktop). */
       addShortcut: ({ keys, run }) =>
         call('ui.addShortcut', { keys: String(keys), handler: fn(run, 'run') }),
+      /** Needs "interface". Shows or hides track play counts across the UI. */
+      showTrackPlays: (show = true) => call('ui.showTrackPlays', { show: !!show }),
       /** Opens a built-in place ("songs", "albums", "artists", "queue", "playlists",
        *  "settings", "plugins") or a tab by the id addTab resolved to. */
       navigate: (target) => call('ui.navigate', { target: String(target) }),

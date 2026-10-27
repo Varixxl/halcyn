@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'fetcher.dart' show touchLyrics;
 import 'library.dart';
 
 class LyricLine {
@@ -40,12 +41,16 @@ Future<Lyrics?> loadLyrics(
   String trackPath, {
   Future<String?> Function(String trackPath)? fetch,
 }) async {
+  final downloaded = downloadedLyrics(trackPath);
   for (final file in [
-    File(lyricsPath(trackPath)),
-    ?downloadedLyrics(trackPath),
+    if (!isStream(trackPath)) File(lyricsPath(trackPath)),
+    ?downloaded,
   ]) {
     try {
-      return parseLrc(await file.readAsString());
+      final lyrics = parseLrc(await file.readAsString());
+      // Shown: not one to clear (see Fetcher.clearUnusedLyrics).
+      if (file == downloaded) await touchLyrics(file);
+      return lyrics;
     } on Object {
       // Not there, or unreadable.
     }

@@ -10,6 +10,8 @@ import 'library.dart';
 import 'player.dart';
 import 'playlists.dart';
 
+export 'library.dart' show isStream;
+
 /// The services Halcyn streams from, by key.
 const serviceNames = {'tidal': 'Tidal', 'ytm': 'YouTube Music'};
 
@@ -18,8 +20,6 @@ String serviceOf(String path) => path.startsWith('tidal:')
     : path.startsWith('ytm:')
     ? 'ytm'
     : 'local';
-
-bool isStream(String path) => serviceOf(path) != 'local';
 
 /// Tidal and YouTube Music: the accounts, finding songs, importing playlists, the Home
 /// page, and sending listens back. Streamed songs are tracks like files (their paths are
@@ -91,6 +91,9 @@ class StreamingController extends ChangeNotifier {
     player.substitute = preferred;
     notifyListeners();
   }
+
+  /// After signing in or out elsewhere (the Halcyn account brought a sign-in).
+  Future<void> refreshAccounts() => _refreshAccounts();
 
   Future<void> _refreshAccounts() async {
     accounts = await streamingAccounts();
@@ -250,6 +253,31 @@ class StreamingController extends ChangeNotifier {
     }
     progress?.call(tracks.length, tracks.length);
     return playlists.create(list.name, [for (final t in chosen) t.path]);
+  }
+
+  /// The best copy of a streamed song on the linked services: Tidal's FLAC for a
+  /// YouTube Music song when Tidal has the same recording, else the song itself.
+  Future<Track> best(Track track) async {
+    if (_rank(track) >= 3) return track;
+    for (final service in services) {
+      if (service == serviceOf(track.path)) continue;
+      final found = await _find(track, service);
+      if (found != null && _rank(found) > _rank(track)) return found;
+    }
+    return track;
+  }
+
+  /// A file of the user's own that's as good as [track], whatever [preferLocal] says.
+  Track? localCopy(Track track) {
+    final candidates = _local[matchKey(track.title, track.artists)] ?? const [];
+    for (final local in candidates) {
+      if (track.durationSecs > 0 &&
+          (local.durationSecs - track.durationSecs).abs() > 4) {
+        continue;
+      }
+      if (_rank(local) >= _rank(track)) return local;
+    }
+    return null;
   }
 
   /// The same song on `service`, if it's there and at least as good.

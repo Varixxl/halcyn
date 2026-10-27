@@ -1,4 +1,8 @@
+#[doc(hidden)]
+pub mod account;
 pub mod api;
+#[doc(hidden)]
+pub mod discord;
 #[doc(hidden)]
 pub mod engine;
 mod frb_generated;

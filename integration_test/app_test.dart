@@ -453,8 +453,10 @@ void main() {
     scope.sort.setTracks('songs', const TrackSort(TrackSortKey.title));
     await _wait(tester, 400);
 
-    // Settings → Theme: every template is listed, and clicking one switches to it.
+    // Settings → Themes: every template is listed, and clicking one switches to it.
     await tester.tap(find.byTooltip('Settings'));
+    await _wait(tester, 800);
+    await tester.tap(find.widgetWithText(Tab, 'Themes'));
     await _wait(tester, 800);
     final themes = scope.themes;
     final original = themes.current;
@@ -468,6 +470,8 @@ void main() {
     await _shot('12-settings-other-theme');
     await themes.select(original);
     await _wait(tester, 400);
+    await tester.tap(find.widgetWithText(Tab, 'General'));
+    await _wait(tester, 800);
 
     // Settings → Streaming: both services, each with a way to sign in (or out). Without
     // one linked there's no Home.
@@ -488,6 +492,18 @@ void main() {
     expect(find.text(streaming.youtube ? 'Sign out' : 'Sign in'), findsWidgets);
     expect(find.text('Home'), streaming.linked ? findsWidgets : findsNothing);
     await _shot('11b-streaming-settings');
+    // The lyrics clean-up is there (not pressed: these are the user's own lyrics).
+    await tester.scrollUntilVisible(
+      find.text('Clear unused lyrics'),
+      300,
+      scrollable: find
+          .ancestor(
+            of: find.text('Streaming'),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.widgetWithText(OutlinedButton, 'Clear'), findsOneWidget);
 
     // Sound: a headphone correction and bass turn the EQ on and show in the signal path;
     // volume does too. (Nothing is saved while testing.)

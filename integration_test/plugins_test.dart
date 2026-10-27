@@ -43,7 +43,8 @@ void main() {
     final scope = tester.widget<AppScope>(find.byType(AppScope));
     final plugins = scope.plugins;
     final player = scope.player;
-    expect(plugins.plugins, isEmpty);
+    // Only the plugins that come with the app.
+    expect(plugins.plugins.keys, ['io.github.varixxl.play-counts']);
 
     // Installing: the info block is checked; a broken one is refused up front.
     expect(
@@ -85,7 +86,8 @@ void main() {
     await _sidebar(tester, 'Manage plugins');
     await tester.tap(find.text('Manage plugins'));
     await _wait(tester, 800);
-    expect(find.text('Read and change your library'), findsOneWidget);
+    // Discover's card and play-counts'.
+    expect(find.text('Read and change your library'), findsNWidgets(2));
     expect(find.text('Control playback'), findsOneWidget);
     await tester.tap(find.text('Play a random album'));
     await _until(tester, () => player.current != null && player.playing);
@@ -251,7 +253,13 @@ halcyn.hooks.beforePlay(({ tracks, start }) => {
     await tester.scrollUntilVisible(
       find.text('Set me'),
       200,
-      scrollable: find.byType(Scrollable).last,
+      // Settings' General tab.
+      scrollable: find
+          .ancestor(
+            of: find.text('Music folders'),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     expect(find.text('Reshape settings'), findsOneWidget);
 

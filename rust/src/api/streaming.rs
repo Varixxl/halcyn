@@ -114,6 +114,28 @@ pub fn streaming_youtube_sign_out() {
     youtube::sign_out();
 }
 
+/// The service's sign-in as JSON (for the Halcyn account's vault), or None when signed out.
+pub fn streaming_export(service_name: String) -> Result<Option<String>> {
+    Ok(match service(&service_name)? {
+        "tidal" => tidal::export(),
+        _ => youtube::export(),
+    })
+}
+
+/// Signs in with a sign-in from `streaming_export` on another device.
+pub fn streaming_import(service_name: String, saved: String) -> Result<()> {
+    match service(&service_name)? {
+        "tidal" => tidal::import(&saved),
+        _ => youtube::import(&saved),
+    }
+}
+
+/// The cover addresses of remembered streamed songs (None for a song without one), so a
+/// playlist synced to another device can bring them along.
+pub fn streaming_art_urls(paths: Vec<String>) -> Result<Vec<Option<String>>> {
+    with(|l| l.stream_art_urls(&paths))
+}
+
 /// Lets the app find YouTube audio addresses itself (the phone's extractor). The function
 /// returns the address, or "" when it couldn't.
 pub fn streaming_set_youtube_resolver(
@@ -254,6 +276,28 @@ pub fn streaming_remember(tracks: Vec<RemoteTrack>) -> Result<Vec<Track>> {
 /// Downloads the whole streamed song at `path` (for casting it) and returns the file.
 pub fn streaming_download(path: String) -> Result<String> {
     Ok(streaming::download(&path)?.to_string_lossy().into_owned())
+}
+
+/// Saves the streamed song at `path` in `folder` as `Artist/Album/Title.flac` (or `.m4a`)
+/// with its tags and cover (`art`, from the art cache) written in. Returns the file; a song
+/// already saved there is kept as it is.
+pub fn streaming_save(
+    path: String,
+    folder: String,
+    title: String,
+    artists: Vec<String>,
+    album: Option<String>,
+    art: Option<String>,
+) -> Result<String> {
+    let cover = match art {
+        Some(key) => {
+            let dir = with(|l| Ok(l.art_dir().to_path_buf()))?;
+            std::fs::read(dir.join(format!("{key}-full.jpg"))).ok()
+        }
+        None => None,
+    };
+    let tags = streaming::Tags { title: &title, artists: &artists, album: album.as_deref(), cover };
+    Ok(streaming::save(&path, std::path::Path::new(&folder), &tags)?.to_string_lossy().into_owned())
 }
 
 /// Every streamed song remembered.

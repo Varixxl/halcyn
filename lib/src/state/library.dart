@@ -7,6 +7,9 @@ import 'package:flutter/foundation.dart';
 
 import '../rust/api/library.dart';
 
+bool isStream(String path) =>
+    path.startsWith('tidal:') || path.startsWith('ytm:');
+
 class Album {
   Album(this.title, this.artist);
 
@@ -75,6 +78,19 @@ class LibraryController extends ChangeNotifier {
   /// Lyrics were downloaded for these.
   void addLyrics(Set<String> paths) {
     withLyrics = {...withLyrics, ...paths};
+    notifyListeners();
+  }
+
+  /// Their downloaded lyrics were deleted.
+  Future<void> removeLyrics(Set<String> paths) async {
+    final still = await Future.wait([
+      for (final p in paths)
+        File(lyricsPath(p)).exists().then((has) => has ? p : null),
+    ]);
+    withLyrics = {
+      ...withLyrics.difference(paths),
+      ...still.nonNulls.where((p) => !isStream(p)),
+    };
     notifyListeners();
   }
 

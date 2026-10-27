@@ -99,41 +99,54 @@ class TrackListHeader extends StatelessWidget {
       );
     }
 
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.only(left: 12),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Palette.outline)),
-      ),
-      child: Row(
-        children: [
-          if (columns.wide) SizedBox(width: 40, child: Text('#', style: style)),
-          Expanded(flex: 18, child: title('TITLE', TrackSortKey.title)),
-          if (columns.wide) ...[
-            const SizedBox(width: 14),
-            Expanded(flex: 15, child: title('ARTIST', TrackSortKey.artist)),
-          ],
-          if (columns.album) ...[
-            const SizedBox(width: 14),
-            Expanded(flex: 13, child: title('ALBUM', TrackSortKey.album)),
-          ],
-          if (columns.wide)
-            SizedBox(
-              width: 78,
-              child: title('FORMAT', TrackSortKey.quality, right: true),
-            ),
-          SizedBox(
-            width: 54,
-            child: title('TIME', TrackSortKey.duration, right: true),
+    final scope = AppScope.of(context);
+    return ListenableBuilder(
+      listenable: scope.plugins,
+      builder: (context, _) {
+        final showPlays = scope.plugins.showTrackPlays;
+        return Container(
+          height: 32,
+          padding: const EdgeInsets.only(left: 12),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: Palette.outline)),
           ),
-          SizedBox(
-            width: 48,
-            child: sort != null && onSort != null
-                ? SortMenu(sort: sort!, onSort: onSort!, natural: natural)
-                : null,
+          child: Row(
+            children: [
+              if (columns.wide)
+                SizedBox(width: 40, child: Text('#', style: style)),
+              Expanded(flex: 18, child: title('TITLE', TrackSortKey.title)),
+              if (columns.wide) ...[
+                const SizedBox(width: 14),
+                Expanded(flex: 15, child: title('ARTIST', TrackSortKey.artist)),
+              ],
+              if (columns.album) ...[
+                const SizedBox(width: 14),
+                Expanded(flex: 13, child: title('ALBUM', TrackSortKey.album)),
+              ],
+              if (columns.wide)
+                SizedBox(
+                  width: 78,
+                  child: title('FORMAT', TrackSortKey.quality, right: true),
+                ),
+              if (showPlays)
+                SizedBox(
+                  width: 52,
+                  child: title('PLAYS', TrackSortKey.plays, right: true),
+                ),
+              SizedBox(
+                width: 54,
+                child: title('TIME', TrackSortKey.duration, right: true),
+              ),
+              SizedBox(
+                width: 48,
+                child: sort != null && onSort != null
+                    ? SortMenu(sort: sort!, onSort: onSort!, natural: natural)
+                    : null,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -267,12 +280,16 @@ class _TrackRowState extends State<TrackRow> {
 
   @override
   Widget build(BuildContext context) {
-    final player = AppScope.of(context).player;
+    final scope = AppScope.of(context);
+    final player = scope.player;
+    final plugins = scope.plugins;
+    final library = scope.library;
     return ListenableBuilder(
-      listenable: player,
+      listenable: Listenable.merge([player, plugins, library]),
       builder: (context, _) {
         final current =
             widget.current ?? player.current?.path == widget.track.path;
+        final showPlays = plugins.showTrackPlays;
         return MouseRegion(
           onEnter: (_) => setState(() => _hover = true),
           onExit: (_) => setState(() => _hover = false),
@@ -295,7 +312,13 @@ class _TrackRowState extends State<TrackRow> {
                   borderRadius: BorderRadius.circular(Palette.r(16)),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: _row(context, current, player.playing),
+                    child: _row(
+                      context,
+                      current,
+                      player.playing,
+                      showPlays,
+                      library,
+                    ),
                   ),
                 ),
               ),
@@ -306,7 +329,13 @@ class _TrackRowState extends State<TrackRow> {
     );
   }
 
-  Widget _row(BuildContext context, bool current, bool playing) {
+  Widget _row(
+    BuildContext context,
+    bool current,
+    bool playing,
+    bool showPlays,
+    LibraryController library,
+  ) {
     final track = widget.track;
     final columns = widget.columns;
     final muted = TextStyle(fontSize: 13, color: Palette.textMuted);
@@ -395,6 +424,18 @@ class _TrackRowState extends State<TrackRow> {
             child: Align(
               alignment: Alignment.centerRight,
               child: QualityLabel(track: track),
+            ),
+          ),
+        if (showPlays)
+          SizedBox(
+            width: 52,
+            child: Text(
+              formatPlays(library.plays(track)),
+              textAlign: TextAlign.right,
+              style: muted.copyWith(
+                fontSize: 12,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         SizedBox(
@@ -761,11 +802,18 @@ class CollectionPage extends StatelessWidget {
                 onDeleted();
                 scope.playlists.delete(playlist);
               }
+            } else if (choice == 'download') {
+              scope.downloads.add(tracks);
             }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'rename', child: Text('Rename…')),
-            PopupMenuItem(value: 'delete', child: Text('Delete…')),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'rename', child: Text('Rename…')),
+            if (tracks.any((t) => isStream(t.path)))
+              const PopupMenuItem(
+                value: 'download',
+                child: Text('Download streamed songs'),
+              ),
+            const PopupMenuItem(value: 'delete', child: Text('Delete…')),
           ],
         ),
       ),

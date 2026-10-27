@@ -145,4 +145,60 @@ void main() {
     await f.run();
     expect(asked.map((u) => u.host).toSet(), {'lrclib.net'});
   });
+
+  test('a streamed song gets its lyrics as it plays, searched for', () async {
+    final stream = _track('tidal:5', 'Three (2012 Remaster)', album: 'Other');
+    final f = Fetcher(
+      library: library,
+      player: PlayerController(events: const Stream<PlayerEvent>.empty()),
+      settings: File('${dir.path}/fetch.json'),
+      userAgent: 'Halcyn/test',
+      persist: false,
+      get: (url) async {
+        asked.add(url);
+        if (url.path != '/api/search') return (404, Uint8List(0));
+        // The same title, one far longer (a live take), then the recording.
+        expect(url.queryParameters['track_name'], 'Three');
+        final body = jsonEncode([
+          {'duration': 320, 'syncedLyrics': '[00:01.00] live'},
+          {'duration': 202, 'plainLyrics': 'plain'},
+          {'duration': 200, 'syncedLyrics': '[00:01.00] studio'},
+        ]);
+        return (200, Uint8List.fromList(utf8.encode(body)));
+      },
+    );
+    expect(await f.lyricsNow(stream), '[00:01.00] studio');
+    expect(
+      downloadedLyrics('tidal:5')!.readAsStringSync(),
+      '[00:01.00] studio',
+    );
+    expect(library.withLyrics, contains('tidal:5'));
+    // Downloaded once: read from the file after that.
+    asked.clear();
+    expect(await f.lyricsNow(stream), '[00:01.00] studio');
+    expect(asked, isEmpty);
+  });
+
+  test('clears only the lyrics not used for a week', () async {
+    final f = fetcher(art: false);
+    final old = downloadedLyrics('/m/1.flac')!
+      ..createSync(recursive: true)
+      ..writeAsStringSync('[00:01.00] one');
+    final recent = downloadedLyrics('/m/2.flac')!
+      ..writeAsStringSync('[00:01.00] two');
+    final weekAgo = DateTime.now().subtract(const Duration(days: 8));
+    old.setLastModifiedSync(weekAgo);
+    recent.setLastModifiedSync(weekAgo);
+    library.addLyrics({'/m/1.flac', '/m/2.flac'});
+    // Playing the second song counts as using its lyrics.
+    expect(await f.lyricsNow(library.tracks[1]), '[00:01.00] two');
+
+    expect(await f.clearUnusedLyrics(), 1);
+    expect(old.existsSync(), isFalse);
+    expect(recent.existsSync(), isTrue);
+    expect(library.withLyrics, {'/m/2.flac'});
+    // Not fetched again in the background straight away.
+    await f.run();
+    expect(asked, isEmpty);
+  });
 }

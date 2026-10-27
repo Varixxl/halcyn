@@ -403,6 +403,18 @@ impl Library {
     }
 
     /// Every streamed song come across.
+    pub fn stream_art_urls(&self, paths: &[String]) -> Result<Vec<Option<String>>> {
+        let mut stmt = self.db.prepare(
+            "SELECT stream_art.url FROM stream_tracks
+              JOIN stream_art ON stream_art.art = stream_tracks.art
+              WHERE stream_tracks.path = ?1 LIMIT 1",
+        )?;
+        paths
+            .iter()
+            .map(|p| Ok(stmt.query_row([p], |r| r.get(0)).optional()?))
+            .collect()
+    }
+
     pub fn stream_tracks(&self) -> Result<Vec<Track>> {
         self.stream_tracks_where(&[])
     }

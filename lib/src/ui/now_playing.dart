@@ -705,13 +705,23 @@ class LyricsView extends StatefulWidget {
 }
 
 class _LyricsViewState extends State<LyricsView> {
-  // While casting, the .lrc is on the other device.
-  late final Future<Lyrics?> _lyrics = loadLyrics(
-    widget.path,
-    fetch: AppScope.of(context).cast.connected
-        ? AppScope.of(context).cast.lyrics
-        : null,
-  );
+  // While casting, the .lrc is on the other device. Otherwise, a song without lyrics
+  // yet gets them from LRCLIB (or is getting them, since it started playing).
+  late final Future<Lyrics?> _lyrics = () {
+    final scope = AppScope.of(context);
+    return loadLyrics(
+      widget.path,
+      fetch: scope.cast.connected
+          ? scope.cast.lyrics
+          : (path) async => switch (scope.library.byPath(path) ??
+                (scope.player.current?.path == path
+                    ? scope.player.current
+                    : null)) {
+              final track? => scope.fetcher.lyricsNow(track),
+              null => null,
+            },
+    );
+  }();
   final _scroll = ScrollController();
   List<GlobalKey> _keys = const [];
   Lyrics? _loaded;

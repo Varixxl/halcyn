@@ -40,6 +40,9 @@ void main() {
     expect(env['HALCYN_CAST_DISCOVERY_PORT'], isNotNull);
 
     await app.main(const []);
+    // A desktop-sized view, whatever size the tiling gives the test's window.
+    tester.view.physicalSize =
+        const Size(1280, 800) * tester.view.devicePixelRatio;
     await _wait(tester, 2500);
     final scope = tester.widget<AppScope>(find.byType(AppScope));
     final desktop = scope.player;
@@ -227,12 +230,31 @@ void main() {
     // Settings shows who's casting here, and the updates section.
     await tester.tap(find.byTooltip('Settings').first);
     await _wait(tester, 600);
-    await tester.drag(find.byType(Scrollable).last, const Offset(0, -3000));
-    await _wait(tester, 600);
-    expect(find.text('Let other devices play here'), findsOneWidget);
-    expect(find.text('Playing from Test phone'), findsOneWidget);
-    expect(find.text('Check for updates automatically'), findsOneWidget);
-    await _shot(tester, 'cast-4-settings');
+    // The General tab's list, held on to: "Music folders" scrolls out of it.
+    final general = find.byWidget(
+      tester.widget<Scrollable>(
+        find
+            .ancestor(
+              of: find.text('Music folders'),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      ),
+    );
+    for (final text in [
+      'Let other devices play here',
+      'Playing from Test phone',
+      'Check for updates automatically',
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(text),
+        300,
+        scrollable: general,
+      );
+      await _wait(tester, 300);
+      expect(find.text(text), findsOneWidget);
+      if (text.startsWith('Playing')) await _shot(tester, 'cast-4-settings');
+    }
 
     // Stopping: the phone gets its own queue back and the desktop plays on.
     await tester.runAsync(cast.disconnect);

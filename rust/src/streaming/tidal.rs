@@ -107,6 +107,21 @@ pub fn session() -> Option<Session> {
     STATE.lock().unwrap().session.clone()
 }
 
+/// The sign-in as JSON, for the Halcyn account's vault.
+pub fn export() -> Option<String> {
+    session().map(|s| s.to_json().to_string())
+}
+
+/// Signs in with a sign-in exported on another device.
+pub fn import(saved: &str) -> Result<()> {
+    let session = serde_json::from_str::<Value>(saved)
+        .ok()
+        .and_then(|v| Session::from_json(&v))
+        .ok_or_else(|| anyhow!("that isn't a Tidal sign-in"))?;
+    set_session(Some(session));
+    Ok(())
+}
+
 fn set_session(session: Option<Session>) {
     let mut state = STATE.lock().unwrap();
     if let Some(file) = &state.file {

@@ -1,5 +1,8 @@
 import '../cast/receiver.dart';
 import '../cast/sender.dart';
+import '../state/account.dart';
+import '../state/discord.dart';
+import '../state/downloads.dart';
 import '../state/fetcher.dart';
 import '../state/plugins.dart';
 import '../state/streaming.dart';
@@ -40,6 +43,9 @@ class AppScope extends InheritedWidget {
     required this.plugins,
     required this.fetcher,
     required this.streaming,
+    required this.account,
+    required this.downloads,
+    required this.discord,
     required super.child,
   });
 
@@ -58,6 +64,9 @@ class AppScope extends InheritedWidget {
   final PluginManager plugins;
   final Fetcher fetcher;
   final StreamingController streaming;
+  final AccountController account;
+  final DownloadsController downloads;
+  final DiscordPresence discord;
 
   static AppScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!;
@@ -183,14 +192,18 @@ class TrackTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final player = AppScope.of(context).player;
+    final scope = AppScope.of(context);
+    final player = scope.player;
+    final plugins = scope.plugins;
+    final library = scope.library;
     final wide = MediaQuery.sizeOf(context).width >= 900;
 
     return ListenableBuilder(
-      listenable: player,
+      listenable: Listenable.merge([player, plugins, library]),
       builder: (context, _) {
         final current = player.current?.id == track.id;
         final titleColor = current ? Palette.accent : Palette.text;
+        final showPlays = plugins.showTrackPlays;
         return AnimatedContainer(
           duration: Motion.medium,
           curve: Motion.curve,
@@ -272,6 +285,20 @@ class TrackTile extends StatelessWidget {
                   const SizedBox(width: 16),
                   if (wide) ...[
                     QualityLabel(track: track),
+                    const SizedBox(width: 16),
+                  ],
+                  if (showPlays) ...[
+                    SizedBox(
+                      width: 44,
+                      child: Text(
+                        formatPlays(library.plays(track)),
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Palette.textMuted,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 16),
                   ],
                   SizedBox(
@@ -708,6 +735,21 @@ String clock(double secs) {
   final m = (s % 3600) ~/ 60;
   final ss = (s % 60).toString().padLeft(2, '0');
   return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$ss' : '$m:$ss';
+}
+
+/// Formats a track's play count: "0", "42", "1.2k", "1.5M".
+String formatPlays(int count) {
+  if (count >= 1000000) {
+    final v = count / 1000000;
+    return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}M';
+  }
+  if (count >= 10000) {
+    return '${(count / 1000).toStringAsFixed(0)}k';
+  }
+  if (count >= 1000) {
+    return '${(count / 1000).toStringAsFixed(1)}k';
+  }
+  return '$count';
 }
 
 /// "3 h 12 min" / "42 min" for album and playlist lengths.

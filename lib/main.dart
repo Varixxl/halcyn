@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,9 @@ import 'src/rust/api/streaming.dart';
 import 'src/rust/frb_generated.dart';
 import 'src/cast/receiver.dart';
 import 'src/cast/sender.dart';
+import 'src/state/account.dart';
+import 'src/state/discord.dart';
+import 'src/state/downloads.dart';
 import 'src/state/android.dart';
 import 'src/state/error_log.dart';
 import 'src/state/library.dart';
@@ -163,6 +167,37 @@ Future<void> main(List<String> args) async {
   );
   await fetcher.load();
   fetcher.start();
+  final account = AccountController(
+    library: library,
+    playlists: playlists,
+    streaming: streaming,
+    state: File('${data.path}/account.json'),
+    // Tests never reach the account server.
+    online: listening,
+  );
+  // In the background: renewing the session may wait on the network.
+  unawaited(account.load());
+  final downloads = DownloadsController(
+    library: library,
+    streaming: streaming,
+    settings: File('${data.path}/downloads.json'),
+    // Tests download into a folder of their own.
+    folder: listening ? null : '${cache.path}/downloads-test',
+    persist: listening,
+  );
+  await downloads.load();
+  final discord = DiscordPresence(
+    player: player,
+    account: account,
+    settings: File('${data.path}/discord.json'),
+    device: name,
+    persist: listening,
+    // Tests leave the user's Discord alone.
+    online: listening,
+    send: listening ? null : (_) {},
+  );
+  await discord.load();
+  discord.start();
   await Future.wait([
     access.start(),
     MediaSession.start(player, library, artDir, cast),
@@ -188,6 +223,9 @@ Future<void> main(List<String> args) async {
       plugins: plugins,
       fetcher: fetcher,
       streaming: streaming,
+      account: account,
+      downloads: downloads,
+      discord: discord,
       child: const HalcynApp(),
     ),
   );

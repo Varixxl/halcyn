@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'account.dart';
 import 'cast.dart';
 import 'plugin_view.dart';
 import 'plugins_page.dart';
@@ -10,8 +11,53 @@ import 'theme_picker.dart';
 import 'updates.dart';
 import 'widgets.dart';
 
+/// Settings, in two tabs: everything else, and the themes.
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => DefaultTabController(
+    length: 2,
+    child: Column(
+      children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              dividerColor: Colors.transparent,
+              tabs: [
+                Tab(text: 'General'),
+                Tab(text: 'Themes'),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            children: [
+              const _General(),
+              ListView(
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  16,
+                  24,
+                  24 + dockInset(context),
+                ),
+                children: const [ThemePicker()],
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _General extends StatelessWidget {
+  const _General();
 
   @override
   Widget build(BuildContext context) {
@@ -26,17 +72,9 @@ class SettingsPage extends StatelessWidget {
         return ListView(
           padding: EdgeInsets.only(bottom: 24 + dockInset(context)),
           children: [
+            const AccountSettings(),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
-              child: Text('Theme', style: theme.textTheme.titleMedium),
-            ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: ThemePicker(),
-            ),
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
               child: Text('Music folders', style: theme.textTheme.titleMedium),
             ),
             for (final folder in library.folders)
@@ -126,7 +164,9 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const StreamingSettings(),
+            const _SongDownloads(),
             const _DownloadSettings(),
+            const _DiscordSettings(),
             const CastSettings(),
             // Plugins' own settings.
             for (final section in plugins.settingsSections) ...[
@@ -173,6 +213,134 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
+/// Where downloaded songs go, and how the downloading is going.
+class _SongDownloads extends StatelessWidget {
+  const _SongDownloads();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final downloads = AppScope.of(context).downloads;
+    return ListenableBuilder(
+      listenable: downloads,
+      builder: (context, _) {
+        final muted = theme.textTheme.bodySmall?.copyWith(
+          color: Palette.textMuted,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+              child: Text('Downloads', style: theme.textTheme.titleMedium),
+            ),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              leading: const Icon(Icons.download_for_offline_outlined),
+              title: Text(downloads.folder),
+              subtitle: const Text(
+                'Streamed songs you download go here, in Artist and Album '
+                'folders, from whichever linked service has them best',
+              ),
+              trailing: OutlinedButton(
+                onPressed: downloads.busy
+                    ? null
+                    : () async {
+                        final dir = await getDirectoryPath();
+                        if (dir != null) await downloads.setFolder(dir);
+                      },
+                child: const Text('Change'),
+              ),
+            ),
+            if (downloads.busy)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      value: downloads.total == 0
+                          ? null
+                          : (downloads.done + downloads.failed) /
+                                downloads.total,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Downloading ${downloads.current?.title ?? ''} '
+                            '(${downloads.done + downloads.failed + 1} of '
+                            '${downloads.total})',
+                            style: muted,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: downloads.cancel,
+                          child: const Text('Stop'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
+            else if (downloads.done + downloads.failed > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                child: Text(
+                  [
+                    'Downloaded ${downloads.done - downloads.skipped}',
+                    if (downloads.skipped > 0)
+                      '${downloads.skipped} already in your library',
+                    if (downloads.failed > 0)
+                      '${downloads.failed} failed (${downloads.lastError})',
+                  ].join(' · '),
+                  style: muted,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// What's playing on the user's Discord profile (see `DiscordPresence`).
+class _DiscordSettings extends StatelessWidget {
+  const _DiscordSettings();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final discord = AppScope.of(context).discord;
+    return ListenableBuilder(
+      listenable: discord,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+            child: Text('Discord', style: theme.textTheme.titleMedium),
+          ),
+          SwitchListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            title: const Text('Show what you\'re playing on Discord'),
+            subtitle: Text(
+              '${discord.local ? 'Through the Discord app on this computer, ' : ''}'
+              'with the cover, a visualizer and a button for friends to get '
+              'Halcyn. ${discord.status}',
+            ),
+            value: discord.on,
+            onChanged: discord.setOn,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Downloading covers and lyrics the library is missing (see `Fetcher`).
 class _DownloadSettings extends StatelessWidget {
   const _DownloadSettings();
@@ -207,11 +375,37 @@ class _DownloadSettings extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(horizontal: 24),
             title: const Text('Download missing lyrics'),
             subtitle: const Text(
-              'For songs without a .lrc file, from LRCLIB. Kept in Halcyn\'s own '
-              'folder, not beside your music',
+              'For songs without a .lrc file, from LRCLIB, and for streamed songs '
+              'as they play. Kept in Halcyn\'s own folder, not beside your music',
             ),
             value: fetcher.lyrics,
             onChanged: fetcher.setLyrics,
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+            title: const Text('Clear unused lyrics'),
+            subtitle: const Text(
+              'Deletes downloaded lyrics of songs not played or shown in the last '
+              '7 days. Playing a song gets them again',
+            ),
+            trailing: OutlinedButton(
+              onPressed: () async {
+                final cleared = await fetcher.clearUnusedLyrics();
+                if (!context.mounted) return;
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      cleared == 0
+                          ? 'No unused lyrics to clear'
+                          : 'Cleared lyrics of $cleared '
+                                '${cleared == 1 ? 'song' : 'songs'}',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: const Text('Clear'),
+            ),
           ),
           if (fetcher.status case final status?)
             Padding(
