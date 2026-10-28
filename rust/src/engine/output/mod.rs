@@ -44,6 +44,12 @@ impl Shared {
         if rate == 0 {
             return;
         }
+        // A latency this large is a broken timestamp, not a real device: fall back to
+        // following the callbacks rather than drawing seconds behind.
+        if latency.as_millis() > MAX_HEARD_LAG_MS {
+            self.origin_nanos.store(0, Relaxed);
+            return;
+        }
         let played = self.frames_played.load(Relaxed) as u128;
         let at = now_nanos() as u128 + latency.as_nanos();
         let origin = at.saturating_sub(played * 1_000_000_000 / rate);
@@ -59,14 +65,23 @@ impl Shared {
             return played;
         }
         let since = now_nanos().saturating_sub(origin) as u128;
-        ((since * rate / 1_000_000_000) as u64).min(played)
+        // Never trail the callbacks by more than MAX_HEARD_LAG_MS, whatever the device
+        // claims: the visualizer's history only reaches so far back.
+        let floor = played.saturating_sub((rate * MAX_HEARD_LAG_MS / 1000) as u64);
+        ((since * rate / 1_000_000_000) as u64).clamp(floor, played)
     }
 }
 
-/// Nanoseconds on a monotonic clock shared by the audio and engine threads.
+/// How far behind the callbacks `Shared::heard` may report, in milliseconds. Bluetooth
+/// outputs can claim several hundred; anything past this is treated as a bad timestamp.
+pub const MAX_HEARD_LAG_MS: u128 = 1000;
+
+/// Nanoseconds on a monotonic clock shared by the audio and engine threads. Starts an hour
+/// in, so an origin computed back from a burst of early callbacks can't underflow.
 pub fn now_nanos() -> u64 {
+    const START: u64 = 3_600 * 1_000_000_000;
     static EPOCH: OnceLock<Instant> = OnceLock::new();
-    EPOCH.get_or_init(Instant::now).elapsed().as_nanos() as u64
+    START + EPOCH.get_or_init(Instant::now).elapsed().as_nanos() as u64
 }
 
 pub trait Output: Send {
@@ -130,5 +145,48 @@ mod tests {
     #[test]
     fn falls_back_to_the_highest_rate() {
         assert_eq!(choose_rate(192000, &caps(&[48000, 96000])), 96000);
+    }
+}
+
+#[cfg(test)]
+mod heard_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn shared(rate: u32, played: u64) -> Shared {
+        let s = Shared::default();
+        s.device_rate.store(rate, Relaxed);
+        s.frames_played.store(played, Relaxed);
+        s
+    }
+
+    #[test]
+    fn follows_a_normal_latency() {
+        let s = shared(48_000, 96_000);
+        s.mark_heard(Duration::from_millis(100));
+        let lag = 96_000 - s.heard();
+        assert!((4_000..=4_900).contains(&lag), "lag {lag}");
+    }
+
+    #[test]
+    fn ignores_an_absurd_latency() {
+        let s = shared(48_000, 480_000);
+        s.mark_heard(Duration::from_millis(100));
+        s.mark_heard(Duration::from_secs(5));
+        assert_eq!(s.heard(), 480_000);
+    }
+
+    #[test]
+    fn never_trails_past_the_cap() {
+        let s = shared(48_000, 480_000);
+        s.mark_heard(Duration::from_millis(900));
+        s.frames_played.store(960_000, Relaxed);
+        assert!(s.heard() >= 960_000 - 48_000);
+    }
+
+    #[test]
+    fn falls_back_without_timestamps() {
+        let s = shared(48_000, 1234);
+        assert_eq!(s.heard(), 1234);
     }
 }

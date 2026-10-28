@@ -151,9 +151,11 @@ impl Session {
         self.ring.slots() == self.ring.buffer().capacity()
     }
 
-    /// Enough history to reach back from the speakers past the whole ring.
+    /// Enough history to reach back past the whole ring, then as far behind the callbacks as
+    /// `Shared::heard` can report, plus the analyser's window.
     fn new_history(&self) -> History {
-        History::new(self.ring.buffer().capacity() + self.rate as usize / 2 * self.channels)
+        let behind_ms = output::MAX_HEARD_LAG_MS as usize + 500;
+        History::new(self.ring.buffer().capacity() + self.rate as usize * behind_ms / 1000 * self.channels)
     }
 }
 
