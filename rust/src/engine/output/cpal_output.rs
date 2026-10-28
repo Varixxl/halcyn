@@ -215,7 +215,11 @@ fn build<T: SizedSample + FromSample<i32> + Send + 'static>(
     device
         .build_output_stream::<T, _, _>(
             config,
-            move |out: &mut [T], _| feed.fill(out),
+            move |out: &mut [T], info: &cpal::OutputCallbackInfo| {
+                let ts = info.timestamp();
+                feed.shared.mark_heard(ts.playback.duration_since(ts.callback));
+                feed.fill(out)
+            },
             |err| eprintln!("audio output: {err}"),
             None,
         )

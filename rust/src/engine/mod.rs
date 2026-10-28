@@ -207,7 +207,11 @@ impl Runner {
 
     fn run(mut self, rx: mpsc::Receiver<Command>) {
         loop {
-            let wait = Duration::from_millis(if self.playing { 10 } else { 250 });
+            let mut wait = Duration::from_millis(if self.playing { 10 } else { 250 });
+            // Wake for the visualizer's next frame too, or it only updates every other tick.
+            if let Some(spectrum) = self.spectrum.as_ref().filter(|_| self.playing) {
+                wait = wait.min(SPECTRUM_EVERY.saturating_sub(spectrum.last.elapsed()).max(Duration::from_millis(1)));
+            }
             match rx.recv_timeout(wait) {
                 Ok(cmd) => {
                     if let Err(err) = self.handle(cmd) {
@@ -353,7 +357,7 @@ impl Runner {
             };
             let analyzer = spectrum.analyzer.insert(analyzer);
             if let Some(history) = &session.history {
-                let frame = session.shared.frames_played.load(Relaxed);
+                let frame = session.shared.heard();
                 if let Some(bands) = analyzer.analyse(history, frame) {
                     (spectrum.sink)(bands);
                 }
