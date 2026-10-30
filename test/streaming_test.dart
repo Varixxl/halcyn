@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ Track _track(
   String codec = 'FLAC',
   int sampleRate = 44100,
   int? bits = 16,
+  String? isrc,
 }) => Track(
   id: 0,
   path: path,
@@ -29,6 +31,7 @@ Track _track(
   codec: codec,
   added: 0,
   plays: 0,
+  isrc: isrc,
 );
 
 void main() {
@@ -60,10 +63,62 @@ void main() {
       0,
     );
     expect(bareTitle('Song 2 - 2012 Remaster'), 'Song 2');
+    // What an ISRC search on YouTube Music finds first is the song; what comes after isn't.
+    final lucky = _track('/m/lucky.flac', 'Get Lucky');
+    expect(
+      looselySameSong(
+        lucky,
+        const RemoteTrack(
+          path: 'ytm:a',
+          title: 'Get Lucky (feat. Pharrell Williams and Nile Rodgers)',
+          artists: ['Daft Punk'],
+          durationSecs: 250,
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      looselySameSong(
+        lucky,
+        const RemoteTrack(
+          path: 'ytm:b',
+          title: 'MONTAGEM URANIUM (Ultra Slowed)',
+          artists: ['ZAYLO'],
+          durationSecs: 126,
+        ),
+      ),
+      isFalse,
+    );
     expect(
       matchKey('Get Lucky [Radio Edit]', ['Daft Punk']),
       matchKey('get lucky', ['DAFT PUNK']),
     );
+  });
+
+  test('a track without a length takes the engine\'s', () async {
+    final events = StreamController<PlayerEvent>();
+    final learned = <Track>[];
+    final player = PlayerController(events: events.stream, onLength: learned.add);
+    player.queue = [_track('ytm:a', 'Quick pick', duration: 0, codec: 'AAC')];
+    events.add(
+      const PlayerEvent.loaded(
+        track: TrackInfo(path: 'ytm:a', title: 'Quick pick', durationSecs: 212.4),
+        index: 0,
+      ),
+    );
+    await pumpEventQueue();
+    expect(player.current?.durationSecs, 212.4);
+    expect(learned.single.durationSecs, 212.4);
+    // One that has a length keeps it.
+    events.add(
+      const PlayerEvent.loaded(
+        track: TrackInfo(path: 'ytm:a', title: 'Quick pick', durationSecs: 100),
+        index: 0,
+      ),
+    );
+    await pumpEventQueue();
+    expect(player.current?.durationSecs, 212.4);
+    await events.close();
   });
 
   group('with a library', () {
@@ -113,6 +168,32 @@ void main() {
       // Unless turned off.
       streaming.setPreferLocal(false);
       expect(streaming.preferred(lossless).path, 'tidal:1');
+    });
+
+    test('knows a file by its ISRC, however it\'s titled', () {
+      library.tracks = [
+        ...library.tracks,
+        _track(
+          '/m/renamed.flac',
+          'Untitled 7',
+          artists: ['Unknown'],
+          duration: 300,
+          isrc: 'USQX91300108',
+        ),
+      ];
+      streaming.debugIndexLocal();
+      final stream = _track(
+        'tidal:9',
+        'Get Lucky (feat. Pharrell Williams and Nile Rodgers)',
+        duration: 369,
+        codec: 'Lossless',
+        isrc: 'USQX91300108',
+      );
+      expect(streaming.preferred(stream).path, '/m/renamed.flac');
+      expect(streaming.localCopy(stream)?.path, '/m/renamed.flac');
+      // Not as good as hi-res, ISRC or not.
+      final hiRes = _track('tidal:10', 'X', codec: 'Hi-res', isrc: 'USQX91300108');
+      expect(streaming.preferred(hiRes).path, 'tidal:10');
     });
 
     test('only shows linked services, in the chosen order', () {

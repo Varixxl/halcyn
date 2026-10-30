@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../cast/protocol.dart' show copyTrack;
 import '../rust/api/library.dart';
 import '../rust/api/player.dart';
 
@@ -26,6 +27,7 @@ class PlayerController extends ChangeNotifier {
   PlayerController({
     this.session,
     this.onListened,
+    this.onLength,
     Stream<PlayerEvent>? events,
   }) {
     _events = (events ?? playerEvents()).listen(_onEvent);
@@ -36,6 +38,10 @@ class PlayerController extends ChangeNotifier {
 
   /// Called once per track that has been listened to (half of it, or 4 minutes).
   final void Function(Track track)? onListened;
+
+  /// Called when a track that came without a length (some of YouTube Music's) gets one
+  /// from the engine, with the track as it is now.
+  final void Function(Track track)? onLength;
 
   late final StreamSubscription<PlayerEvent> _events;
 
@@ -418,10 +424,25 @@ class PlayerController extends ChangeNotifier {
     final track = current;
     if (!_counted &&
         track != null &&
-        secs >= min(240, track.durationSecs / 2)) {
+        // Half of it, or 4 minutes (all there is to go on for a track of unknown length).
+        secs >= (track.durationSecs > 0 ? min(240, track.durationSecs / 2) : 240)) {
       _counted = true;
       onListened?.call(track);
     }
+  }
+
+  /// Without a length the seek bar can't show progress or seek: the engine's, when the
+  /// track had none.
+  void _learnLength(int index, double? secs) {
+    if (secs == null || secs <= 0 || index < 0 || index >= queue.length) return;
+    final track = queue[index];
+    if (track.durationSecs > 0) return;
+    final known = copyTrack(track, durationSecs: secs);
+    queue = [...queue]..[index] = known;
+    if (_unshuffled case final list?) {
+      _unshuffled = [for (final t in list) t.path == known.path ? known : t];
+    }
+    onLength?.call(known);
   }
 
   void _onEvent(PlayerEvent event) {
@@ -429,8 +450,9 @@ class PlayerController extends ChangeNotifier {
     // before is about the queue in _local.
     if (_remote != null) return;
     switch (event) {
-      case PlayerEvent_Loaded(:final index):
+      case PlayerEvent_Loaded(:final index, :final track):
         this.index = index;
+        _learnLength(index, track.durationSecs);
         signalPath = null;
         error = null;
         position.value = 0;

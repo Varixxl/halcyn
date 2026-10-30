@@ -9,7 +9,7 @@ use lofty::prelude::*;
 use lofty::tag::ItemKey;
 
 const AUDIO_EXTENSIONS: &[&str] = &[
-    "flac", "wav", "wave", "aiff", "aif", "aifc", "mp3", "m4a", "mp4", "ogg", "oga", "mka",
+    "flac", "wav", "wave", "aiff", "aif", "aifc", "mp3", "m4a", "mp4", "ogg", "oga", "opus", "mka",
     "webm", "caf",
 ];
 
@@ -37,6 +37,8 @@ pub struct Scanned {
     pub bits: Option<u32>,
     pub channels: u32,
     pub codec: String,
+    /// The recording's ISRC, when the file is tagged with it.
+    pub isrc: Option<String>,
     /// The cover image's bytes, before it is written to the art cache.
     pub picture: Option<Vec<u8>>,
 }
@@ -117,6 +119,7 @@ pub fn read(file: &Found) -> Option<Scanned> {
         bits: props.bit_depth().map(u32::from),
         channels: props.channels().map_or(2, u32::from),
         codec: codec_name(tagged.file_type()).to_string(),
+        isrc: text(ItemKey::Isrc).map(|i| i.trim().replace('-', "").to_uppercase()).filter(|i| i.len() == 12),
         picture,
     })
 }

@@ -204,6 +204,9 @@ class Track {
   /// Unix seconds.
   final PlatformInt64? lastPlayed;
 
+  /// The recording's ISRC: from the file's tags, or the service (Tidal's songs have one).
+  final String? isrc;
+
   const Track({
     required this.id,
     required this.path,
@@ -223,6 +226,7 @@ class Track {
     required this.added,
     required this.plays,
     this.lastPlayed,
+    this.isrc,
   });
 
   @override
@@ -244,7 +248,8 @@ class Track {
       art.hashCode ^
       added.hashCode ^
       plays.hashCode ^
-      lastPlayed.hashCode;
+      lastPlayed.hashCode ^
+      isrc.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -268,5 +273,6 @@ class Track {
           art == other.art &&
           added == other.added &&
           plays == other.plays &&
-          lastPlayed == other.lastPlayed;
+          lastPlayed == other.lastPlayed &&
+          isrc == other.isrc;
 }

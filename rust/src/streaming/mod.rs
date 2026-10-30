@@ -48,37 +48,49 @@ pub fn is_stream(path: &Path) -> bool {
     path.to_str().is_some_and(|p| parse(p).is_some())
 }
 
-/// The song at `path` for the decoder, and what kind of file it is.
-pub fn open(path: &str) -> Result<(Box<dyn MediaSource>, &'static str)> {
+/// A streamed song, opened for the decoder.
+pub struct Opened {
+    pub media: Box<dyn MediaSource>,
+    /// What kind of file it is.
+    pub ext: &'static str,
+    /// Its length in seconds, when the service says: a DASH stream's or WebM's container
+    /// doesn't, and the player needs it to show progress and seek.
+    pub secs: Option<f64>,
+}
+
+/// The song at `path` for the decoder.
+pub fn open(path: &str) -> Result<Opened> {
     let (service, id) = parse(path).ok_or_else(|| anyhow!("{path} isn't a streamed song"))?;
     let dir = cache_dir();
     let key = format!("{service}-{id}");
-    for ext in ["flac", "mp4", "m4a"] {
+    for ext in ["flac", "mp4", "m4a", "webm"] {
         if let Some(file) = download::cached(&dir, &key, ext) {
             let file = File::options().read(true).write(true).open(&file)?;
             // Played again: the last to go when the cache is full.
             let _ = file.set_modified(SystemTime::now());
-            return Ok((Box::new(file), ext));
+            return Ok(Opened { media: Box::new(file), ext, secs: download::length(&dir, &key) });
         }
     }
-    let (parts, ext, total) = match service {
+    let (parts, ext, total, secs) = match service {
         "tidal" => {
             let plan = tidal::stream(id)?;
-            (plan.parts, plan.ext, None)
+            (plan.parts, plan.ext, None, plan.secs)
         }
         _ => {
             std::fs::create_dir_all(&dir)?;
-            let (parts, total) = youtube::ranges(&youtube::audio_url(id, &dir)?);
-            (parts, "m4a", total)
+            let url = youtube::audio_url(id, &dir)?;
+            let (parts, total) = youtube::ranges(&url);
+            (parts, youtube::kind(&url), total, youtube::duration(&url))
         }
     };
-    Ok((Box::new(download::start(&dir, &key, ext, parts, total)?), ext))
+    let media = download::start(&dir, &key, ext, parts, total, secs)?;
+    Ok(Opened { media: Box::new(media), ext, secs })
 }
 
 /// The whole song at `path`, downloaded into the stream cache (casting sends it on).
 pub fn download(path: &str) -> Result<PathBuf> {
     let (service, id) = parse(path).ok_or_else(|| anyhow!("{path} isn't a streamed song"))?;
-    let (mut media, ext) = open(path)?;
+    let Opened { mut media, ext, .. } = open(path)?;
     // Reading to the end waits for the download to finish.
     std::io::copy(&mut media, &mut std::io::sink())?;
     drop(media);
@@ -91,6 +103,8 @@ pub struct Tags<'a> {
     pub title: &'a str,
     pub artists: &'a [String],
     pub album: Option<&'a str>,
+    /// The recording's ISRC, so the file is known as the same song on any service.
+    pub isrc: Option<&'a str>,
     /// The cover, as JPEG.
     pub cover: Option<Vec<u8>>,
 }
@@ -103,7 +117,7 @@ pub fn save(path: &str, folder: &Path, tags: &Tags) -> Result<PathBuf> {
     let album = tags.album.filter(|a| !a.trim().is_empty()).unwrap_or(tags.title);
     let dir = folder.join(safe_name(artist)).join(safe_name(album));
     let name = safe_name(tags.title);
-    for ext in ["flac", "m4a"] {
+    for ext in ["flac", "m4a", "opus"] {
         let saved = dir.join(format!("{name}.{ext}"));
         if saved.exists() {
             return Ok(saved);
@@ -111,14 +125,23 @@ pub fn save(path: &str, folder: &Path, tags: &Tags) -> Result<PathBuf> {
     }
     let cached = download(path)?;
     std::fs::create_dir_all(&dir)?;
-    // Tidal sends most FLAC inside MP4: unwrapped into a .flac file like any other. What
-    // isn't FLAC (YouTube's AAC) stays an .m4a.
+    // Tidal sends most FLAC inside MP4: unwrapped into a .flac file like any other.
+    // YouTube's Opus comes in WebM, which taggers and players mostly don't take: moved into
+    // an .opus file as it is. What's left (YouTube's AAC) stays an .m4a.
     let flac = dir.join(format!(".{name}.part.flac"));
     let ext = if cached.extension().is_some_and(|e| e == "flac") {
         std::fs::copy(&cached, &flac)?;
         "flac"
     } else if unwrap_flac(&cached, &flac).unwrap_or(false) {
         "flac"
+    } else if cached.extension().is_some_and(|e| e == "webm") {
+        let _ = std::fs::remove_file(&flac);
+        let opus = dir.join(format!(".{name}.part.opus"));
+        if let Err(e) = webm_to_ogg(&cached, &opus) {
+            let _ = std::fs::remove_file(&opus);
+            return Err(e);
+        }
+        "opus"
     } else {
         let _ = std::fs::remove_file(&flac);
         std::fs::copy(&cached, dir.join(format!(".{name}.part.m4a")))?;
@@ -189,6 +212,126 @@ fn unwrap_flac(mp4: &Path, out: &Path) -> Result<bool> {
     Ok(samples > 0)
 }
 
+/// Moves the Opus stream out of a WebM into an Ogg Opus file (RFC 7845), packets as they are.
+fn webm_to_ogg(webm: &Path, out: &Path) -> Result<()> {
+    use std::io::Write;
+    use symphonia::core::formats::probe::Hint;
+    use symphonia::core::formats::{FormatOptions, TrackType};
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+
+    let stream = MediaSourceStream::new(Box::new(File::open(webm)?), Default::default());
+    let mut format = symphonia::default::get_probe().probe(
+        Hint::new().with_extension("webm"),
+        stream,
+        FormatOptions::default(),
+        MetadataOptions::default(),
+    )?;
+    let track = format.default_track(TrackType::Audio).ok_or_else(|| anyhow!("no audio in the WebM"))?;
+    let id = track.id;
+    let params = track.codec_params.as_ref().and_then(|p| p.audio()).ok_or_else(|| anyhow!("no audio in the WebM"))?;
+    if params.codec != symphonia::core::codecs::audio::well_known::CODEC_ID_OPUS {
+        anyhow::bail!("the WebM isn't Opus");
+    }
+    let head = params
+        .extra_data
+        .as_deref()
+        .filter(|h| h.starts_with(b"OpusHead"))
+        .ok_or_else(|| anyhow!("the WebM has no OpusHead"))?
+        .to_vec();
+    let pre_skip = u16::from_le_bytes([head[10], head[11]]) as u64;
+
+    let mut ogg = OggWriter { file: std::io::BufWriter::new(File::create(out)?), serial: 0x4861_6c63, sequence: 0 };
+    ogg.page(&[&head], 0, 0x02)?;
+    let vendor = b"Halcyn";
+    let mut tags = b"OpusTags".to_vec();
+    tags.extend((vendor.len() as u32).to_le_bytes());
+    tags.extend(vendor);
+    tags.extend(0u32.to_le_bytes());
+    ogg.page(&[&tags], 0, 0)?;
+
+    // Audio pages of about 4 KB, each marked with where its last packet ends.
+    let mut granule = pre_skip;
+    let mut pending: Vec<Vec<u8>> = Vec::new();
+    let mut size = 0;
+    loop {
+        let packet = match format.next_packet() {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            Err(symphonia::core::errors::Error::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(e) => return Err(e.into()),
+        };
+        if packet.track_id != id || packet.data.is_empty() {
+            continue;
+        }
+        let frames = unsafe { crate::engine::opus::ffi::opus_packet_get_nb_samples(packet.data.as_ptr(), packet.data.len() as i32, 48_000) };
+        if frames <= 0 {
+            continue;
+        }
+        if size + packet.data.len() > 4096 && !pending.is_empty() {
+            let parts: Vec<&[u8]> = pending.iter().map(Vec::as_slice).collect();
+            ogg.page(&parts, granule, 0)?;
+            pending.clear();
+            size = 0;
+        }
+        granule += frames as u64;
+        size += packet.data.len();
+        pending.push(packet.data.to_vec());
+    }
+    let parts: Vec<&[u8]> = pending.iter().map(Vec::as_slice).collect();
+    ogg.page(&parts, granule, 0x04)?;
+    ogg.file.flush()?;
+    Ok(())
+}
+
+struct OggWriter<W: std::io::Write> {
+    file: W,
+    serial: u32,
+    sequence: u32,
+}
+
+impl<W: std::io::Write> OggWriter<W> {
+    /// One page holding whole `packets` (each under 64 KB, at most 255 lacing values in all).
+    fn page(&mut self, packets: &[&[u8]], granule: u64, flags: u8) -> Result<()> {
+        let mut lacing = Vec::new();
+        for p in packets {
+            lacing.extend(std::iter::repeat_n(255u8, p.len() / 255));
+            lacing.push((p.len() % 255) as u8);
+        }
+        if lacing.len() > 255 {
+            anyhow::bail!("an Ogg page can't hold that much");
+        }
+        let mut page = b"OggS\0".to_vec();
+        page.push(flags);
+        page.extend(granule.to_le_bytes());
+        page.extend(self.serial.to_le_bytes());
+        page.extend(self.sequence.to_le_bytes());
+        page.extend([0; 4]);
+        page.push(lacing.len() as u8);
+        page.extend(&lacing);
+        for p in packets {
+            page.extend_from_slice(p);
+        }
+        let crc = ogg_crc(&page);
+        page[22..26].copy_from_slice(&crc.to_le_bytes());
+        self.file.write_all(&page)?;
+        self.sequence += 1;
+        Ok(())
+    }
+}
+
+/// Ogg's CRC-32: polynomial 0x04c11db7, not reflected, starting at 0.
+fn ogg_crc(data: &[u8]) -> u32 {
+    let mut crc = 0u32;
+    for &b in data {
+        crc ^= (b as u32) << 24;
+        for _ in 0..8 {
+            crc = if crc & 0x8000_0000 != 0 { (crc << 1) ^ 0x04c1_1db7 } else { crc << 1 };
+        }
+    }
+    crc
+}
+
 fn write_tags(file: &Path, tags: &Tags) -> Result<()> {
     use lofty::config::WriteOptions;
     use lofty::picture::{MimeType, Picture, PictureType};
@@ -207,6 +350,9 @@ fn write_tags(file: &Path, tags: &Tags) -> Result<()> {
     }
     if let Some(lead) = tags.artists.first() {
         tag.insert_text(ItemKey::AlbumArtist, lead.clone());
+    }
+    if let Some(isrc) = tags.isrc {
+        tag.insert_text(ItemKey::Isrc, isrc.to_owned());
     }
     if let Some(cover) = &tags.cover {
         tag.remove_picture_type(PictureType::CoverFront);
@@ -277,6 +423,13 @@ mod tests {
             lists.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
         );
         println!("mixes: {:?}", tidal::mixes().map(|m| m.len()));
+        let isrc = found.iter().find_map(|t| t.isrc.clone()).unwrap();
+        let same = tidal::by_isrc(&isrc).unwrap();
+        println!(
+            "by ISRC {isrc}: {:?}",
+            same.iter().map(|t| (&t.path, &t.title, &t.album, &t.quality)).collect::<Vec<_>>()
+        );
+        assert!(!same.is_empty());
         for t in found
             .iter()
             .filter(|t| t.quality.as_deref() == Some("Hi-res"))
@@ -315,7 +468,7 @@ mod tests {
         }
         // Saved as a tagged file of its own, Artist/Album/Title.
         let song = found.iter().find(|t| t.quality.as_deref() == Some("Lossless")).unwrap();
-        let tags = Tags { title: &song.title, artists: &song.artists, album: song.album.as_deref(), cover: None };
+        let tags = Tags { title: &song.title, artists: &song.artists, album: song.album.as_deref(), isrc: song.isrc.as_deref(), cover: None };
         let saved = save(&song.path, &tmp.join("Downloads"), &tags).unwrap();
         let tagged = lofty::read_from_path(&saved).unwrap();
         use lofty::prelude::*;
@@ -331,6 +484,28 @@ mod tests {
             std::fs::copy(&saved, keep).unwrap();
         }
         let _ = std::fs::remove_dir_all(tmp);
+    }
+
+    /// Moves HALCYN_TEST_WEBM (YouTube's Opus) into an Ogg file, tags it, and leaves it at
+    /// HALCYN_TEST_OGG for checking with ffmpeg.
+    #[test]
+    #[ignore]
+    fn webm_becomes_ogg() {
+        let webm = std::env::var("HALCYN_TEST_WEBM").expect("HALCYN_TEST_WEBM");
+        let out = PathBuf::from(std::env::var("HALCYN_TEST_OGG").expect("HALCYN_TEST_OGG"));
+        webm_to_ogg(Path::new(&webm), &out).unwrap();
+        let artists = vec!["Someone".to_owned()];
+        write_tags(&out, &Tags { title: "A song", artists: &artists, album: Some("An album"), isrc: None, cover: None }).unwrap();
+        let tagged = lofty::read_from_path(&out).unwrap();
+        use lofty::prelude::*;
+        assert_eq!(tagged.primary_tag().and_then(|t| t.title()).as_deref(), Some("A song"));
+        let mut source = Source::open(&out).unwrap();
+        let mut buf = Vec::new();
+        let mut frames = 0;
+        while source.read(Samples::Float(&mut buf)).unwrap() {
+            frames += buf.len() / 2;
+        }
+        println!("{:?}, decoded {frames} frames", source.info);
     }
 
     #[test]
@@ -360,7 +535,7 @@ mod tests {
         std::fs::write(cache.join("tidal-1.flac"), flac).unwrap();
         std::fs::write(cache.join("tidal-1.done"), b"").unwrap();
         let artists = vec!["Daft Punk".to_owned(), "Pharrell Williams".to_owned()];
-        let tags = Tags { title: "Get Lucky", artists: &artists, album: Some("R.A.M."), cover: None };
+        let tags = Tags { title: "Get Lucky", artists: &artists, album: Some("R.A.M."), isrc: Some("USQX91300108"), cover: None };
         let saved = save("tidal:1", &tmp.join("Downloads"), &tags).unwrap();
         assert_eq!(saved, tmp.join("Downloads/Daft Punk/R.A.M/Get Lucky.flac"));
         let tagged = lofty::read_from_path(&saved).unwrap();
@@ -368,6 +543,7 @@ mod tests {
         let tag = tagged.primary_tag().unwrap();
         assert_eq!(tag.title().as_deref(), Some("Get Lucky"));
         assert_eq!(tag.artist().as_deref(), Some("Daft Punk, Pharrell Williams"));
+        assert_eq!(tag.get_string(lofty::tag::ItemKey::Isrc), Some("USQX91300108"));
         // Saving it again keeps the file.
         assert_eq!(save("tidal:1", &tmp.join("Downloads"), &tags).unwrap(), saved);
         let _ = std::fs::remove_dir_all(tmp);
@@ -409,7 +585,7 @@ mod tests {
             std::fs::metadata(&file).unwrap().len()
         );
         let song = &found[0];
-        let tags = Tags { title: &song.title, artists: &song.artists, album: song.album.as_deref(), cover: None };
+        let tags = Tags { title: &song.title, artists: &song.artists, album: song.album.as_deref(), isrc: song.isrc.as_deref(), cover: None };
         let saved = save(&song.path, &tmp.join("Downloads"), &tags).unwrap();
         let tagged = lofty::read_from_path(&saved).unwrap();
         use lofty::prelude::*;

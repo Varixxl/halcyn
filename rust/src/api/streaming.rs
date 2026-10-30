@@ -177,6 +177,15 @@ pub fn streaming_search(service_name: String, query: String) -> Result<Vec<Remot
     }
 }
 
+/// The songs on a service that are the recording with this ISRC: Tidal looks it up; on
+/// YouTube Music, searching for it finds the song first (the rest are unrelated).
+pub fn streaming_by_isrc(service_name: String, isrc: String) -> Result<Vec<RemoteTrack>> {
+    match service(&service_name)? {
+        "tidal" => tidal::by_isrc(&isrc),
+        _ => Ok(youtube::search(&isrc)?.into_iter().take(1).collect()),
+    }
+}
+
 pub fn streaming_playlists(service_name: String) -> Result<Vec<RemotePlaylist>> {
     match service(&service_name)? {
         "tidal" => tidal::playlists(),
@@ -296,6 +305,7 @@ pub fn streaming_save(
     artists: Vec<String>,
     album: Option<String>,
     art: Option<String>,
+    isrc: Option<String>,
 ) -> Result<String> {
     let cover = match art {
         Some(key) => {
@@ -304,7 +314,8 @@ pub fn streaming_save(
         }
         None => None,
     };
-    let tags = streaming::Tags { title: &title, artists: &artists, album: album.as_deref(), cover };
+    let tags =
+        streaming::Tags { title: &title, artists: &artists, album: album.as_deref(), isrc: isrc.as_deref(), cover };
     Ok(streaming::save(&path, std::path::Path::new(&folder), &tags)?.to_string_lossy().into_owned())
 }
 

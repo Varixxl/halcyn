@@ -19,6 +19,8 @@ const CLIENT_ID: &str = env!("TIDAL_CLIENT_ID");
 const CLIENT_SECRET: &str = env!("TIDAL_CLIENT_SECRET");
 pub const REDIRECT: &str = "https://tidal.com/android/login/auth";
 const V1: &str = "https://api.tidal.com/v1/";
+/// The newer API, which finds songs by ISRC.
+const V2: &str = "https://openapi.tidal.com/v2/";
 const CLIENT_VERSION: &str = "2025.7.16";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -333,6 +335,10 @@ enum Method {
 /// A call to Tidal's API as the signed-in user: renews the sign-in when it runs out, and
 /// waits and tries again (longer each time) when Tidal says there are too many requests.
 fn api(path: &str, params: &[(&str, String)], method: Method) -> Result<Value> {
+    api_at(V1, path, params, method)
+}
+
+fn api_at(base: &str, path: &str, params: &[(&str, String)], method: Method) -> Result<Value> {
     let mut s = session().ok_or_else(|| anyhow!("sign in to Tidal first"))?;
     if now() > s.expiry - 60.0 && !s.refresh.is_empty() {
         refresh()?;
@@ -345,10 +351,13 @@ fn api(path: &str, params: &[(&str, String)], method: Method) -> Result<Value> {
         if let Some(wait) = quiet.and_then(|q| q.checked_duration_since(Instant::now())) {
             std::thread::sleep(wait);
         }
-        let mut query = vec![("countryCode", s.country.clone()), ("sessionId", s.session.clone())];
+        let mut query = vec![("countryCode", s.country.clone())];
+        if base == V1 {
+            query.push(("sessionId", s.session.clone()));
+        }
         query.extend(params.iter().cloned());
-        let query: Vec<String> = query.iter().map(|(k, v)| format!("{k}={}", encode(v))).collect();
-        let url = format!("{V1}{path}?{}", query.join("&"));
+        let query: Vec<String> = query.iter().map(|(k, v)| format!("{}={}", encode(k), encode(v))).collect();
+        let url = format!("{base}{path}?{}", query.join("&"));
         let request = match &method {
             Method::Get => AGENT.get(&url),
             Method::Post(_) => AGENT.post(&url),
@@ -495,6 +504,19 @@ fn link(text: &str) -> Option<(&'static str, String)> {
     None
 }
 
+/// The songs with this ISRC (one recording, on its single, its album, compilations…).
+pub fn by_isrc(isrc: &str) -> Result<Vec<RemoteTrack>> {
+    let found = api_at(V2, "tracks", &[("filter[isrc]", isrc.to_uppercase())], Method::Get)?;
+    let mut out = Vec::new();
+    for id in found.list("data").iter().filter_map(|t| t.s("id")).take(5) {
+        // The new API's answer lacks what a song needs (album, cover, quality): the old one's.
+        if let Ok(track) = get(&format!("tracks/{id}"), &[]) {
+            out.extend(self::track(&track));
+        }
+    }
+    Ok(out)
+}
+
 pub fn album(id: &str) -> Result<Vec<RemoteTrack>> {
     Ok(tracks(&paged(&format!("albums/{id}/tracks"), 100, false)?))
 }
@@ -599,6 +621,8 @@ pub struct Plan {
     pub parts: Vec<String>,
     pub ext: &'static str,
     pub quality: String,
+    /// The length a DASH stream's manifest gives, in seconds (its MP4 says 0).
+    pub secs: Option<f64>,
 }
 
 pub fn stream(id: &str) -> Result<Plan> {
@@ -625,7 +649,8 @@ pub fn stream(id: &str) -> Result<Plan> {
             bits = 24;
         }
         let quality = if flac { flac_quality(bits, rate) } else { lossy_quality(&level) };
-        return Ok(Plan { parts: dash, ext: "mp4", quality });
+        let secs = attr(&manifest, "mediaPresentationDuration").and_then(|d| iso_secs(&d));
+        return Ok(Plan { parts: dash, ext: "mp4", quality, secs });
     }
     let bts: Value = serde_json::from_str(&manifest)?;
     if bts.s("encryptionType").is_some_and(|e| e != "NONE") {
@@ -640,9 +665,9 @@ pub fn stream(id: &str) -> Result<Plan> {
     if codec.starts_with("FLAC") {
         let bits = info.n("bitDepth").map(|b| b as u32).unwrap_or(16);
         let rate = info.n("sampleRate").map(|r| r as u32);
-        Ok(Plan { parts: vec![url], ext: "flac", quality: flac_quality(bits, rate) })
+        Ok(Plan { parts: vec![url], ext: "flac", quality: flac_quality(bits, rate), secs: None })
     } else {
-        Ok(Plan { parts: vec![url], ext: "m4a", quality: lossy_quality(&level) })
+        Ok(Plan { parts: vec![url], ext: "m4a", quality: lossy_quality(&level), secs: None })
     }
 }
 
@@ -656,6 +681,26 @@ fn lossy_quality(level: &str) -> String {
         "LOW" => "AAC 96 kbps".into(),
         _ => "AAC 320 kbps".into(),
     }
+}
+
+/// Seconds in an ISO 8601 duration like "PT3M45.123S".
+fn iso_secs(d: &str) -> Option<f64> {
+    let rest = d.strip_prefix("PT")?;
+    let mut secs = 0.0;
+    let mut number = String::new();
+    for c in rest.chars() {
+        match c {
+            'H' => secs += number.parse::<f64>().ok()? * 3600.0,
+            'M' => secs += number.parse::<f64>().ok()? * 60.0,
+            'S' => secs += number.parse::<f64>().ok()?,
+            _ => {
+                number.push(c);
+                continue;
+            }
+        }
+        number.clear();
+    }
+    (secs > 0.0).then_some(secs)
 }
 
 fn attr(xml: &str, name: &str) -> Option<String> {
@@ -709,6 +754,8 @@ mod tests {
         );
         assert_eq!(flac_quality(24, Some(96_000)), "24-bit/96 kHz FLAC");
         assert_eq!(flac_quality(16, Some(44_100)), "16-bit/44.1 kHz FLAC");
+        assert_eq!(iso_secs("PT3M45.5S"), Some(225.5));
+        assert_eq!(iso_secs("PT1H0M2S"), Some(3602.0));
     }
 
     #[test]

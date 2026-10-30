@@ -3,6 +3,7 @@
 
 mod convert;
 pub mod dsp;
+pub(crate) mod opus;
 mod output;
 pub(crate) mod source;
 mod spectrum;

@@ -106,6 +106,12 @@ impl Library {
                  ALTER TABLE playlists ADD COLUMN source_mtime INTEGER;",
             )?;
         }
+        // The recording's ISRC. Files already in the library are read again (mtime 0) to get it.
+        let has_isrc: bool =
+            db.prepare("SELECT 1 FROM pragma_table_info('tracks') WHERE name = 'isrc'")?.exists([])?;
+        if !has_isrc {
+            db.execute_batch("ALTER TABLE tracks ADD COLUMN isrc TEXT; UPDATE tracks SET mtime = 0;")?;
+        }
         Ok(Library { db, art_dir })
     }
 
@@ -178,8 +184,8 @@ impl Library {
         {
             let mut upsert = tx.prepare(
                 "INSERT INTO tracks (path, mtime, size, title, artists, album, album_artist,
-                     track_no, disc_no, year, duration, sample_rate, bits, channels, codec, art)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+                     track_no, disc_no, year, duration, sample_rate, bits, channels, codec, art, isrc)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
                  ON CONFLICT (path) DO UPDATE SET
                      mtime = excluded.mtime, size = excluded.size, title = excluded.title,
                      artists = excluded.artists, album = excluded.album,
@@ -187,7 +193,7 @@ impl Library {
                      disc_no = excluded.disc_no, year = excluded.year,
                      duration = excluded.duration, sample_rate = excluded.sample_rate,
                      bits = excluded.bits, channels = excluded.channels, codec = excluded.codec,
-                     art = excluded.art",
+                     art = excluded.art, isrc = excluded.isrc",
             )?;
             for (t, art) in &scanned {
                 upsert.execute(params![
@@ -207,6 +213,7 @@ impl Library {
                     t.channels,
                     t.codec,
                     art,
+                    t.isrc,
                 ])?;
             }
             let mut delete = tx.prepare("DELETE FROM tracks WHERE path = ?1")?;
@@ -313,7 +320,7 @@ impl Library {
             "SELECT id, tracks.path, title, artists, album, album_artist, track_no, disc_no,
                     year, duration, sample_rate, bits, channels, codec,
                     coalesce(tracks.art, fetched_art.art), mtime,
-                    coalesce(plays.count, 0), plays.last
+                    coalesce(plays.count, 0), plays.last, isrc
              FROM tracks LEFT JOIN plays ON plays.path = tracks.path
                   LEFT JOIN fetched_art ON fetched_art.path = tracks.path
              ORDER BY title COLLATE NOCASE",
@@ -339,6 +346,7 @@ impl Library {
                 added: r.get(15)?,
                 plays: r.get(16)?,
                 last_played: r.get(17)?,
+                isrc: r.get(18)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -423,7 +431,7 @@ impl Library {
     fn stream_tracks_where(&self, paths: &[&str]) -> Result<Vec<Track>> {
         let sql =
             "SELECT stream_tracks.id, stream_tracks.path, title, artists, album, duration, codec,
-                          art, seen, coalesce(plays.count, 0), plays.last
+                          art, seen, coalesce(plays.count, 0), plays.last, isrc
                    FROM stream_tracks LEFT JOIN plays ON plays.path = stream_tracks.path";
         let read = |r: &rusqlite::Row| {
             let artists: String = r.get(3)?;
@@ -447,6 +455,7 @@ impl Library {
                 added: r.get(8)?,
                 plays: r.get(9)?,
                 last_played: r.get(10)?,
+                isrc: r.get(11)?,
             })
         };
         if paths.is_empty() {

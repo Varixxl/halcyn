@@ -31,6 +31,8 @@ pub struct Track {
     pub plays: u32,
     /// Unix seconds.
     pub last_played: Option<i64>,
+    /// The recording's ISRC: from the file's tags, or the service (Tidal's songs have one).
+    pub isrc: Option<String>,
 }
 
 #[derive(Clone, Debug)]

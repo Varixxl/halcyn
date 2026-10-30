@@ -43,10 +43,13 @@ pub struct Source {
 impl Source {
     pub fn open(path: &Path) -> Result<Self> {
         let mut hint = Hint::new();
+        // A streamed song's length, from the service: its container may not say.
+        let mut stream_secs = None;
         let media: Box<dyn MediaSource> = if crate::streaming::is_stream(path) {
-            let (media, ext) = crate::streaming::open(&path.to_string_lossy())?;
-            hint.with_extension(ext);
-            media
+            let opened = crate::streaming::open(&path.to_string_lossy())?;
+            hint.with_extension(opened.ext);
+            stream_secs = opened.secs;
+            opened.media
         } else {
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 hint.with_extension(ext);
@@ -67,24 +70,34 @@ impl Source {
             .and_then(|p| p.audio())
             .ok_or_else(|| anyhow!("the audio track has no codec parameters"))?
             .clone();
-        // A fragmented MP4 (a DASH stream) can say 0.
+        // A fragmented MP4 (a DASH stream) can say 0; WebM says nothing.
         let (track_id, time_base, total_frames) =
             (track.id, track.time_base, track.num_frames.filter(|n| *n > 0));
 
-        let decoder = symphonia::default::get_codecs()
-            .make_audio_decoder(&params, &AudioDecoderOptions::default())
-            .context("no decoder for this codec")?;
+        let (decoder, params): (Box<dyn AudioDecoder>, _) = if super::opus::is_opus(&params) {
+            let opus = super::opus::OpusDecoder::try_new(&params)?;
+            // Its rate (always 48 kHz) and channels, as libopus decodes them.
+            let params = opus.codec_params().clone();
+            (Box::new(opus), params)
+        } else {
+            let decoder = symphonia::default::get_codecs()
+                .make_audio_decoder(&params, &AudioDecoderOptions::default())
+                .context("no decoder for this codec")?;
+            (decoder, params)
+        };
         let codec = decoder.codec_info().short_name;
         let lossless = matches!(codec, "flac" | "alac" | "wavpack")
             || (codec.starts_with("pcm_") && !matches!(codec, "pcm_alaw" | "pcm_mulaw"));
 
+        let sample_rate = params.sample_rate.ok_or_else(|| anyhow!("unknown sample rate"))?;
         let info = SourceInfo {
             codec: codec.to_string(),
             lossless,
-            sample_rate: params.sample_rate.ok_or_else(|| anyhow!("unknown sample rate"))?,
+            sample_rate,
             channels: params.channels.as_ref().map(|c| c.count()).unwrap_or(0),
             bits_per_sample: if lossless { params.bits_per_sample } else { None },
-            total_frames,
+            total_frames: total_frames
+                .or_else(|| stream_secs.map(|secs| (secs * sample_rate as f64).round() as u64)),
         };
         if info.channels == 0 {
             return Err(anyhow!("unknown channel layout"));

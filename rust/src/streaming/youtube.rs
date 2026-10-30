@@ -2,7 +2,8 @@
 //! with the cookies of a browser that is. The answers are read by looking for the song and
 //! playlist entries wherever they sit, so a reshuffle of YouTube's layout doesn't lose them.
 //! The audio itself comes from yt-dlp on a computer, NewPipe's extractor on a phone (the
-//! app registers it, see `set_resolver`), as AAC: Halcyn has no Opus decoder.
+//! app registers it, see `set_resolver`): Premium's 256 kbps AAC when the account gets it,
+//! else Opus (in WebM), which beats the 128 kbps AAC everyone gets.
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -587,7 +588,7 @@ pub fn record_listen(id: &str) -> Result<()> {
 
 // ---- playing ----
 
-/// The address of video `id`'s AAC audio.
+/// The address of video `id`'s audio.
 pub fn audio_url(id: &str, scratch: &std::path::Path) -> Result<String> {
     {
         let state = STATE.lock().unwrap();
@@ -596,8 +597,9 @@ pub fn audio_url(id: &str, scratch: &std::path::Path) -> Result<String> {
         }
     }
     let mut command = Command::new("yt-dlp");
-    // 141 is 256 kbps AAC, for Premium accounts; 140 is 128 kbps.
-    command.args(["-f", "141/140/bestaudio[ext=m4a]", "-g", "--no-playlist", "--no-warnings"]);
+    // 141 is 256 kbps AAC, for Premium accounts; 251 is Opus at about 160 kbps; 140 is
+    // 128 kbps AAC.
+    command.args(["-f", "141/251/140/bestaudio", "-g", "--no-playlist", "--no-warnings"]);
     let jar = scratch.join("yt-cookies.txt");
     if let Some(cookie) = cookie() {
         if write_jar(&jar, &cookie).is_ok() {
@@ -618,6 +620,19 @@ pub fn audio_url(id: &str, scratch: &std::path::Path) -> Result<String> {
         );
     }
     Ok(url)
+}
+
+/// What kind of file the audio at `url` is: "webm" (Opus) or "m4a" (AAC).
+pub fn kind(url: &str) -> &'static str {
+    if url.contains("mime=audio%2Fwebm") || url.contains("mime=audio/webm") { "webm" } else { "m4a" }
+}
+
+/// How long the audio at `url` is, in seconds, when the address says (`dur`). WebM and a
+/// stream still downloading don't, so this is how the song's length is known.
+pub fn duration(url: &str) -> Option<f64> {
+    let query = url.split_once('?')?.1;
+    let dur = query.split('&').find_map(|p| p.strip_prefix("dur="))?;
+    dur.parse().ok().filter(|d: &f64| *d > 0.0)
 }
 
 /// YouTube sends one long download at about the speed it plays; pieces of a couple of MB
@@ -672,5 +687,10 @@ mod tests {
         assert_eq!(len, Some(5_000_000));
         assert_eq!(parts.len(), 3);
         assert!(parts[2].ends_with("&range=4194304-4999999"));
+        let opus = "https://r1.googlevideo.com/videoplayback?itag=251&mime=audio%2Fwebm&dur=212.441&clen=1";
+        assert_eq!(kind(opus), "webm");
+        assert_eq!(duration(opus), Some(212.441));
+        assert_eq!(kind("https://r1.googlevideo.com/videoplayback?itag=140&mime=audio%2Fmp4"), "m4a");
     }
 }
+

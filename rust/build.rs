@@ -1,4 +1,5 @@
-//! Builds Signalsmith Stretch (vendor/signalsmith, C++) for pitch and speed, and bakes
+//! Builds Signalsmith Stretch (vendor/signalsmith, C++) for pitch and speed and libopus
+//! (vendor/opus, C) for Opus, and bakes
 //! Tidal's app keys into the core when ../tidal.properties (see tools/tidal-keys.sh)
 //! or the TIDAL_CLIENT_ID / TIDAL_CLIENT_SECRET variables provide them. Without them the
 //! keys are empty and Halcyn offers no Tidal.
@@ -7,6 +8,7 @@ use std::collections::HashMap;
 
 fn main() {
     stretch();
+    opus();
     let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tidal.properties");
     println!("cargo:rerun-if-changed={}", file.display());
     println!("cargo:rerun-if-env-changed=TIDAL_CLIENT_ID");
@@ -45,4 +47,28 @@ fn stretch() {
     if android {
         println!("cargo:rustc-link-lib=c++abi");
     }
+}
+
+/// libopus's plain C, without its CPU-specific extras: decoding needs little, and it builds
+/// the same everywhere (no CMake, which Android and Windows would each need set up).
+fn opus() {
+    println!("cargo:rerun-if-changed=vendor/opus");
+    let sources = std::fs::read_to_string("vendor/opus/sources.txt").expect("vendor/opus/sources.txt");
+    let mut build = cc::Build::new();
+    for file in sources.lines().filter(|l| !l.trim().is_empty()) {
+        build.file(format!("vendor/opus/{file}"));
+    }
+    for dir in ["include", "celt", "silk", "silk/float", "src"] {
+        build.include(format!("vendor/opus/{dir}"));
+    }
+    build
+        .define("OPUS_BUILD", None)
+        // MSVC has no variable-length arrays; alloca works everywhere.
+        .define("USE_ALLOCA", None)
+        .define("HAVE_LRINT", None)
+        .define("HAVE_LRINTF", None)
+        .define("PACKAGE_VERSION", "\"1.5.2\"")
+        .opt_level(2)
+        .warnings(false)
+        .compile("halcyn_opus");
 }

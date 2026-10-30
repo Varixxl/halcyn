@@ -56,6 +56,12 @@ pub fn cached(dir: &Path, key: &str, ext: &str) -> Option<PathBuf> {
     dir.join(format!("{key}.done")).exists().then_some(file).filter(|f| f.exists())
 }
 
+/// The length the service gave a finished download (kept in its `.done` marker), in seconds.
+pub fn length(dir: &Path, key: &str) -> Option<f64> {
+    let text = std::fs::read_to_string(dir.join(format!("{key}.done"))).ok()?;
+    text.trim().parse().ok().filter(|s: &f64| *s > 0.0)
+}
+
 /// How far along the download into the cache as `<key>.*` is, from 0 to 1; None when
 /// there's none under way.
 pub fn progress(dir: &Path, key: &str) -> Option<f64> {
@@ -73,13 +79,15 @@ pub fn progress(dir: &Path, key: &str) -> Option<f64> {
 }
 
 /// Starts downloading `parts` into the cache as `<key>.<ext>` and returns a reader of it.
-/// `total`: the whole length, when known before the download says.
+/// `total`: the whole length, when known before the download says. `secs`: the song's
+/// length, remembered with the finished download (see [length]).
 pub fn start(
     dir: &Path,
     key: &str,
     ext: &str,
     parts: Vec<String>,
     total: Option<u64>,
+    secs: Option<f64>,
 ) -> Result<Growing> {
     std::fs::create_dir_all(dir)?;
     let path = dir.join(format!("{key}.{ext}"));
@@ -149,7 +157,7 @@ pub fn start(
         match result {
             Ok(()) => {
                 p.total = Some(p.written);
-                let _ = File::create(&done_marker);
+                let _ = std::fs::write(&done_marker, secs.map(|s| s.to_string()).unwrap_or_default());
             }
             Err(e) => {
                 let _ = std::fs::remove_file(&partial);

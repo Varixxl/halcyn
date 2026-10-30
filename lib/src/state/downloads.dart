@@ -186,6 +186,7 @@ class DownloadsController extends ChangeNotifier {
       artists: track.artists,
       album: track.album ?? best.album,
       art: best.art ?? track.art,
+      isrc: best.isrc ?? track.isrc,
     );
     return true;
   }

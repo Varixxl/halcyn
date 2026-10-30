@@ -162,7 +162,7 @@ class TrackMatcher {
   }
 }
 
-Track copyTrack(Track t, {String? art}) => Track(
+Track copyTrack(Track t, {String? art, double? durationSecs}) => Track(
   id: t.id,
   path: t.path,
   title: t.title,
@@ -172,7 +172,7 @@ Track copyTrack(Track t, {String? art}) => Track(
   trackNo: t.trackNo,
   discNo: t.discNo,
   year: t.year,
-  durationSecs: t.durationSecs,
+  durationSecs: durationSecs ?? t.durationSecs,
   sampleRate: t.sampleRate,
   bits: t.bits,
   channels: t.channels,
@@ -181,4 +181,5 @@ Track copyTrack(Track t, {String? art}) => Track(
   added: t.added,
   plays: t.plays,
   lastPlayed: t.lastPlayed,
+  isrc: t.isrc,
 );

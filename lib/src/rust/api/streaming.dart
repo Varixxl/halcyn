@@ -96,6 +96,16 @@ Future<List<RemoteTrack>> streamingSearch({
   query: query,
 );
 
+/// The songs on a service that are the recording with this ISRC: Tidal looks it up; on
+/// YouTube Music, searching for it finds the song first (the rest are unrelated).
+Future<List<RemoteTrack>> streamingByIsrc({
+  required String serviceName,
+  required String isrc,
+}) => RustLib.instance.api.crateApiStreamingStreamingByIsrc(
+  serviceName: serviceName,
+  isrc: isrc,
+);
+
 Future<List<RemotePlaylist>> streamingPlaylists({
   required String serviceName,
 }) => RustLib.instance.api.crateApiStreamingStreamingPlaylists(
@@ -150,6 +160,7 @@ Future<String> streamingSave({
   required List<String> artists,
   String? album,
   String? art,
+  String? isrc,
 }) => RustLib.instance.api.crateApiStreamingStreamingSave(
   path: path,
   folder: folder,
@@ -157,6 +168,7 @@ Future<String> streamingSave({
   artists: artists,
   album: album,
   art: art,
+  isrc: isrc,
 );
 
 /// Every streamed song remembered.

@@ -61,6 +61,9 @@ class StreamingController extends ChangeNotifier {
   /// Local tracks by [matchKey], for [preferred].
   Map<String, List<Track>> _local = const {};
 
+  /// Local tracks by ISRC: the same recording, however it's titled.
+  Map<String, List<Track>> _localIsrc = const {};
+
   /// YouTube Music's id for local songs, found when sharing history ('' = not there).
   final _ytmIds = <String, String>{};
 
@@ -191,6 +194,26 @@ class StreamingController extends ChangeNotifier {
   Future<List<Track>> radio(Track track) async =>
       _remember(await streamingRadio(path: track.path));
 
+  /// [track] got its length while playing: remembered, so lists show it too.
+  Future<void> rememberLength(Track track) async {
+    if (!isStream(track.path)) return;
+    try {
+      await _remember([
+        RemoteTrack(
+          path: track.path,
+          title: track.title,
+          artists: track.artists,
+          album: track.album,
+          durationSecs: track.durationSecs,
+          quality: track.codec,
+          isrc: track.isrc,
+        ),
+      ]);
+    } on Object catch (e) {
+      debugPrint('remembering a length: $e');
+    }
+  }
+
   Future<void> like(Track track, bool on) =>
       streamingLike(path: track.path, liked: on);
 
@@ -269,19 +292,38 @@ class StreamingController extends ChangeNotifier {
 
   /// A file of the user's own that's as good as [track], whatever [preferLocal] says.
   Track? localCopy(Track track) {
-    final candidates = _local[matchKey(track.title, track.artists)] ?? const [];
-    for (final local in candidates) {
-      if (track.durationSecs > 0 &&
-          (local.durationSecs - track.durationSecs).abs() > 4) {
-        continue;
-      }
+    for (final local in _localCandidates(track)) {
       if (_rank(local) >= _rank(track)) return local;
     }
     return null;
   }
 
+  /// Files of the user's own that are [track]'s recording: the ones with its ISRC, then
+  /// the ones with its title, lead artist and length.
+  Iterable<Track> _localCandidates(Track track) sync* {
+    final isrc = track.isrc;
+    final seen = <String>{};
+    if (isrc != null) {
+      for (final local in _localIsrc[isrc] ?? const <Track>[]) {
+        if (seen.add(local.path)) yield local;
+      }
+    }
+    for (final local in _local[matchKey(track.title, track.artists)] ?? const <Track>[]) {
+      if (track.durationSecs > 0 &&
+          (local.durationSecs - track.durationSecs).abs() > 4) {
+        continue;
+      }
+      if (seen.add(local.path)) yield local;
+    }
+  }
+
   /// The same song on `service`, if it's there and at least as good.
   Future<Track?> _find(Track t, String service) async {
+    final isrc = t.isrc;
+    if (isrc != null) {
+      final found = await _findByIsrc(t, isrc, service);
+      if (found != null) return found;
+    }
     final lead = t.artists.firstOrNull ?? '';
     final List<RemoteTrack> found;
     try {
@@ -295,7 +337,8 @@ class StreamingController extends ChangeNotifier {
     RemoteTrack? best;
     var bestScore = 0.0;
     for (final c in found) {
-      final score = sameSong(
+      // The same ISRC is the same recording, whatever the titles say.
+      final score = isrc != null && c.isrc == isrc ? 2.0 : sameSong(
         t.title,
         t.artists,
         t.durationSecs,
@@ -313,6 +356,43 @@ class StreamingController extends ChangeNotifier {
     return _rank(track) >= _rank(t) ? track : null;
   }
 
+  /// The recording with this ISRC on `service`: Tidal's best copy (on [t]'s album, when
+  /// it's on several), or the song YouTube Music finds for it, if it's plausibly [t].
+  Future<Track?> _findByIsrc(Track t, String isrc, String service) async {
+    final List<RemoteTrack> found;
+    try {
+      found = await streamingByIsrc(serviceName: service, isrc: isrc);
+    } on Object {
+      return null;
+    }
+    final album = _norm(t.album ?? '');
+    final candidates = [
+      for (final c in found)
+        if (c.isrc == isrc || (service == 'ytm' && looselySameSong(t, c))) c,
+    ];
+    if (candidates.isEmpty) return null;
+    int score(RemoteTrack c) =>
+        _rank(_quality(c)) * 2 +
+        (album.isNotEmpty && _norm(c.album ?? '') == album ? 1 : 0);
+    candidates.sort((a, b) => score(b) - score(a));
+    final [track] = await _remember([candidates.first]);
+    return _rank(track) >= _rank(t) ? track : null;
+  }
+
+  /// How a service's song ranks, before it's remembered as a track.
+  static Track _quality(RemoteTrack c) => Track(
+    id: 0,
+    path: c.path,
+    title: c.title,
+    artists: c.artists,
+    durationSecs: c.durationSecs,
+    sampleRate: 0,
+    channels: 2,
+    codec: c.quality ?? '',
+    added: 0,
+    plays: 0,
+  );
+
   // ---- playing ----
 
   @visibleForTesting
@@ -320,24 +400,21 @@ class StreamingController extends ChangeNotifier {
 
   void _indexLocal() {
     final index = <String, List<Track>>{};
+    final byIsrc = <String, List<Track>>{};
     for (final t in library.tracks) {
       index.putIfAbsent(matchKey(t.title, t.artists), () => []).add(t);
+      if (t.isrc case final isrc?) byIsrc.putIfAbsent(isrc, () => []).add(t);
     }
     _local = index;
+    _localIsrc = byIsrc;
   }
 
   /// What plays for `track`: a file of the user's own that's as good as the stream, when
   /// [preferLocal] is on; else the track.
   Track preferred(Track track) {
     if (!preferLocal || !isStream(track.path)) return track;
-    final candidates = _local[matchKey(track.title, track.artists)];
-    if (candidates == null) return track;
     Track? best;
-    for (final local in candidates) {
-      if (track.durationSecs > 0 &&
-          (local.durationSecs - track.durationSecs).abs() > 4) {
-        continue;
-      }
+    for (final local in _localCandidates(track)) {
       if (_rank(local) < _rank(track)) continue;
       if (best == null || _rank(local) > _rank(best)) best = local;
     }
@@ -428,6 +505,26 @@ const _versionWords = [
   'radio edit',
   'extended',
 ];
+
+/// Whether YouTube Music's answer to an ISRC search is plausibly [t] (it has no ISRCs to
+/// compare): about as long, and sharing the title or the lead artist.
+bool looselySameSong(Track t, RemoteTrack c) {
+  if (t.durationSecs > 0 &&
+      c.durationSecs > 0 &&
+      (t.durationSecs - c.durationSecs).abs() > 10) {
+    return false;
+  }
+  final title = _norm(bareTitle(t.title));
+  final theirs = _norm(bareTitle(c.title));
+  final sameTitle =
+      title.isNotEmpty &&
+      theirs.isNotEmpty &&
+      (theirs.contains(title) || title.contains(theirs));
+  final lead = _norm(t.artists.firstOrNull ?? '');
+  final sameArtist =
+      lead.isNotEmpty && c.artists.any((a) => _norm(a) == lead);
+  return sameTitle || sameArtist;
+}
 
 /// How sure it is that two songs are the same recording, 0 (they aren't) to about 1.
 double sameSong(

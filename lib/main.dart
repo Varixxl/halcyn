@@ -86,6 +86,7 @@ Future<void> main(List<String> args) async {
             streaming.listened(track);
           }
         : null,
+    onLength: (track) => streaming.rememberLength(track),
   );
   final playlists = PlaylistsController();
   streaming = StreamingController(
