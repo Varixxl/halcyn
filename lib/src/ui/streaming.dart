@@ -12,6 +12,7 @@ import '../rust/api/streaming.dart';
 import '../state/streaming.dart';
 import '../theme.dart';
 import 'downloads.dart';
+import 'lookup.dart';
 import 'slate.dart';
 import 'track_list.dart';
 import 'widgets.dart';
@@ -180,7 +181,7 @@ class _Shelf extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               children: [
                 for (final (i, t) in tracks.indexed)
-                  _Card(
+                  RemoteCard(
                     image: Artwork(
                       art: t.art,
                       size: _card,
@@ -192,8 +193,8 @@ class _Shelf extends StatelessWidget {
                     onTap: () => player.playTracks(tracks, i),
                   ),
                 for (final l in lists)
-                  _Card(
-                    image: _RemoteCover(url: l.artUrl, size: _card),
+                  RemoteCard(
+                    image: RemoteCover(url: l.artUrl, size: _card),
                     title: l.name,
                     subtitle: l.count == null ? '' : '${l.count} songs',
                     onTap: () => Navigator.of(context).push(
@@ -210,18 +211,26 @@ class _Shelf extends StatelessWidget {
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({
+/// A cover (or picture) with a title and a line under it, for a row that scrolls sideways.
+class RemoteCard extends StatelessWidget {
+  const RemoteCard({
+    super.key,
     required this.image,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.width = _Shelf._card,
+    this.center = false,
   });
 
   final Widget image;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final double width;
+
+  /// Centres the text, as under an artist's round picture.
+  final bool center;
 
   @override
   Widget build(BuildContext context) {
@@ -232,11 +241,13 @@ class _Card extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(Palette.r(12)),
         child: SizedBox(
-          width: _Shelf._card,
+          width: width,
           child: Padding(
             padding: const EdgeInsets.all(4),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: center
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
               children: [
                 image,
                 const SizedBox(height: 6),
@@ -246,14 +257,15 @@ class _Card extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium,
                 ),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: Palette.textMuted,
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Palette.textMuted,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -263,25 +275,33 @@ class _Card extends StatelessWidget {
   }
 }
 
-/// A playlist's cover from the service, or a placeholder.
-class _RemoteCover extends StatelessWidget {
-  const _RemoteCover({required this.url, required this.size});
+/// A playlist's cover from the service (or an artist's picture), or a placeholder.
+class RemoteCover extends StatelessWidget {
+  const RemoteCover({
+    super.key,
+    required this.url,
+    required this.size,
+    this.round = false,
+  });
 
   final String? url;
   final double size;
+
+  /// An artist's picture: a circle.
+  final bool round;
 
   @override
   Widget build(BuildContext context) {
     final placeholder = ColoredBox(
       color: Palette.surfaceHigh,
       child: Icon(
-        Icons.queue_music_rounded,
+        round ? Icons.person_outline_rounded : Icons.queue_music_rounded,
         size: size * 0.4,
         color: Palette.textMuted,
       ),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(Palette.r(12)),
+      borderRadius: BorderRadius.circular(round ? size / 2 : Palette.r(12)),
       child: SizedBox.square(
         dimension: size,
         child: switch (url) {
@@ -302,9 +322,20 @@ class _RemoteCover extends StatelessWidget {
 
 /// A playlist (or mix, or album) on a service: its songs, to play or import.
 class RemoteListPage extends StatefulWidget {
-  const RemoteListPage({super.key, required this.list});
+  const RemoteListPage({
+    super.key,
+    required this.list,
+    this.artists = const [],
+    this.extra,
+  });
 
   final RemotePlaylist list;
+
+  /// An album's artists, to open on the same service.
+  final List<String> artists;
+
+  /// Shown under the buttons (an album's service switch).
+  final Widget? extra;
 
   @override
   State<RemoteListPage> createState() => _RemoteListPageState();
@@ -366,7 +397,7 @@ class _RemoteListPageState extends State<RemoteListPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _RemoteCover(url: list.artUrl, size: 132),
+                          RemoteCover(url: list.artUrl, size: 132),
                           const SizedBox(width: 20),
                           Expanded(
                             child: Column(
@@ -386,6 +417,19 @@ class _RemoteListPageState extends State<RemoteListPage> {
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                if (widget.artists.isNotEmpty)
+                                  NameLinks(
+                                    names: widget.artists,
+                                    style: TextStyle(
+                                      color: Palette.accentLight,
+                                      fontSize: 15,
+                                    ),
+                                    onOpen: (name) => openRemoteArtist(
+                                      context,
+                                      name,
+                                      service: list.service,
+                                    ),
+                                  ),
                                 Text(
                                   [
                                     serviceNames[list.service] ?? '',
@@ -424,6 +468,10 @@ class _RemoteListPageState extends State<RemoteListPage> {
                                     DownloadButton(tracks: tracks),
                                   ],
                                 ),
+                                if (widget.extra case final extra?) ...[
+                                  const SizedBox(height: 10),
+                                  extra,
+                                ],
                               ],
                             ),
                           ),

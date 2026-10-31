@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/library.dart';
 import '../state/sort.dart';
 import '../theme.dart';
+import 'lookup.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -211,9 +212,10 @@ class AlbumPage extends StatelessWidget {
           style: theme.textTheme.headlineMedium,
         ),
         const SizedBox(height: 6),
-        Text(
-          album.artist,
+        NameLinks(
+          names: [album.artist],
           style: theme.textTheme.titleMedium?.copyWith(color: Palette.accent),
+          onOpen: (name) => openArtist(context, name),
         ),
         const SizedBox(height: 4),
         Text(
@@ -221,10 +223,18 @@ class AlbumPage extends StatelessWidget {
           style: theme.textTheme.bodyMedium?.copyWith(color: Palette.textMuted),
         ),
         const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: () => player.playTracks(album.tracks, 0),
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Play'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: narrow ? WrapAlignment.center : WrapAlignment.start,
+          children: [
+            FilledButton.icon(
+              onPressed: () => player.playTracks(album.tracks, 0),
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Play'),
+            ),
+            FindOnServices(artist: album.artist, album: album.title),
+          ],
         ),
       ],
     );

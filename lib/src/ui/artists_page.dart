@@ -4,6 +4,7 @@ import '../state/library.dart';
 import '../state/sort.dart';
 import '../theme.dart';
 import 'albums_page.dart';
+import 'lookup.dart';
 import 'slate.dart';
 import 'widgets.dart';
 
@@ -159,6 +160,12 @@ class ArtistPage extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                child: FindOnServices(artist: artist.name),
               ),
             ),
             if (artist.albums.isNotEmpty) ...[

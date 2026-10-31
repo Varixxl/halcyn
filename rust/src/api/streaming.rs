@@ -46,6 +46,40 @@ pub struct RemoteShelf {
     pub lists: Vec<RemotePlaylist>,
 }
 
+/// An album on a service. Open it as the `RemotePlaylist` with the same service and id.
+#[derive(Clone, Debug)]
+pub struct RemoteAlbum {
+    pub service: String,
+    /// Tidal: `album:<id>`. YouTube Music: `MPREb_…`.
+    pub id: String,
+    pub title: String,
+    pub artists: Vec<String>,
+    pub year: Option<u32>,
+    /// "Album", "EP" or "Single", when the service says.
+    pub kind: Option<String>,
+    pub art_url: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RemoteArtist {
+    pub service: String,
+    /// Tidal: the artist's number. YouTube Music: a channel id, `UC…`.
+    pub id: String,
+    pub name: String,
+    pub art_url: Option<String>,
+}
+
+/// What a service has of an artist: their popular songs, albums, singles and EPs, and
+/// artists like them.
+#[derive(Clone, Debug)]
+pub struct RemoteArtistPage {
+    pub artist: RemoteArtist,
+    pub tracks: Vec<RemoteTrack>,
+    pub albums: Vec<RemoteAlbum>,
+    pub singles: Vec<RemoteAlbum>,
+    pub similar: Vec<RemoteArtist>,
+}
+
 pub struct StreamingAccounts {
     /// Whether this build can sign in to Tidal (it has the app keys).
     pub tidal_available: bool,
@@ -183,6 +217,27 @@ pub fn streaming_by_isrc(service_name: String, isrc: String) -> Result<Vec<Remot
     match service(&service_name)? {
         "tidal" => tidal::by_isrc(&isrc),
         _ => Ok(youtube::search(&isrc)?.into_iter().take(1).collect()),
+    }
+}
+
+pub fn streaming_search_albums(service_name: String, query: String) -> Result<Vec<RemoteAlbum>> {
+    match service(&service_name)? {
+        "tidal" => tidal::search_albums(&query),
+        _ => youtube::search_albums(&query),
+    }
+}
+
+pub fn streaming_search_artists(service_name: String, query: String) -> Result<Vec<RemoteArtist>> {
+    match service(&service_name)? {
+        "tidal" => tidal::search_artists(&query),
+        _ => youtube::search_artists(&query),
+    }
+}
+
+pub fn streaming_artist(service_name: String, id: String) -> Result<RemoteArtistPage> {
+    match service(&service_name)? {
+        "tidal" => tidal::artist(&id),
+        _ => youtube::artist(&id),
     }
 }
 

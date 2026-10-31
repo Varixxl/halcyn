@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 
 use super::http::{self, Body, Get, AGENT};
-use super::{RemotePlaylist, RemoteShelf, RemoteTrack};
+use super::{RemoteAlbum, RemoteArtist, RemoteArtistPage, RemotePlaylist, RemoteShelf, RemoteTrack};
 
 const ORIGIN: &str = "https://music.youtube.com";
 const DESKTOP_UA: &str = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0";
@@ -331,6 +331,8 @@ fn credits(rs: &[Value]) -> (Vec<String>, Option<String>, f64) {
             .find(|p| {
                 !p.is_empty()
                     && !["Song", "Video", "Single", "EP", "Album"].contains(p)
+                    && !p.ends_with(" plays")
+                    && !p.ends_with(" views")
                     && seconds(p) == 0.0
             })
             .map(|p| vec![p.to_owned()])
@@ -448,6 +450,156 @@ pub fn radio(id: &str) -> Result<Vec<RemoteTrack>> {
     Ok(songs(&next, None).into_iter().take(50).collect())
 }
 
+/// An artist's picture, cropped square (their page's header is a wide banner).
+fn portrait(v: &Value) -> Option<String> {
+    let url = find(v, "thumbnails").first().and_then(|t| t.as_array()?.last()?.s("url"))?;
+    Some(match url.find("=w") {
+        Some(at) if url.contains("googleusercontent") => {
+            format!("{}=w544-h544-p-l90-rj", &url[..at])
+        }
+        _ => url,
+    })
+}
+
+fn browse_id(r: &Value) -> Option<String> {
+    r["navigationEndpoint"]["browseEndpoint"].s("browseId")
+}
+
+/// An album from a search result or an artist page's card: its title, then a line like
+/// "Album • Radiohead • 1997" (search) or "Single • 2021" (the artist's own page).
+fn album_from(id: String, title: String, line: &[Value], art: Option<String>) -> RemoteAlbum {
+    let (artists, _, _) = credits(line);
+    let parts: Vec<String> = line
+        .iter()
+        .filter_map(|r| r.s("text"))
+        .collect::<String>()
+        .split(" • ")
+        .map(|p| p.trim().to_owned())
+        .collect();
+    let kind = parts.first().filter(|p| ["Album", "EP", "Single"].contains(&p.as_str())).cloned();
+    let year = parts.iter().rev().find_map(|p| p.parse().ok().filter(|y| (1900..2200).contains(y)));
+    // With no linked artist, credits() takes the kind or the year for one.
+    let artists = artists
+        .into_iter()
+        .filter(|a| Some(a) != kind.as_ref() && a.parse::<u32>().is_err())
+        .collect();
+    RemoteAlbum { service: "ytm".into(), id, title, artists, year, kind, art_url: art }
+}
+
+fn first_column(r: &Value) -> (String, Vec<Value>) {
+    let cols: Vec<Value> = r
+        .list("flexColumns")
+        .iter()
+        .map(|c| c["musicResponsiveListItemFlexColumnRenderer"]["text"].clone())
+        .collect();
+    let first = cols.first().map(text).unwrap_or_default();
+    (first, cols.iter().skip(1).flat_map(runs).collect())
+}
+
+pub fn search_albums(query: &str) -> Result<Vec<RemoteAlbum>> {
+    // Albums only.
+    let found =
+        call("search", json!({ "query": query, "params": "EgWKAQIYAWoMEA4QChADEAQQCRAF" }))?;
+    Ok(find(&found, "musicResponsiveListItemRenderer")
+        .into_iter()
+        .filter_map(|r| {
+            let id = browse_id(r).filter(|i| i.starts_with("MPRE"))?;
+            let (title, line) = first_column(r);
+            Some(album_from(id, title, &line, thumb(&r["thumbnail"])))
+        })
+        .collect())
+}
+
+pub fn search_artists(query: &str) -> Result<Vec<RemoteArtist>> {
+    // Artists only.
+    let found =
+        call("search", json!({ "query": query, "params": "EgWKAQIgAWoMEA4QChADEAQQCRAF" }))?;
+    Ok(find(&found, "musicResponsiveListItemRenderer")
+        .into_iter()
+        .filter_map(|r| {
+            let id = browse_id(r).filter(|i| i.starts_with("UC"))?;
+            let (name, _) = first_column(r);
+            let art_url = portrait(&r["thumbnail"]);
+            Some(RemoteArtist { service: "ytm".into(), id, name, art_url })
+        })
+        .collect())
+}
+
+/// An artist's channel page: top songs, albums, singles and EPs, and "Fans might also like".
+pub fn artist(id: &str) -> Result<RemoteArtistPage> {
+    let page = browse(id)?;
+    let kinds =
+        ["musicImmersiveHeaderRenderer", "musicVisualHeaderRenderer", "musicHeaderRenderer"];
+    let header = kinds
+        .iter()
+        .find_map(|k| find(&page["header"], k).first().copied())
+        .ok_or_else(|| anyhow!("YouTube Music has no artist {id}"))?;
+    let artist = RemoteArtist {
+        service: "ytm".into(),
+        id: id.to_owned(),
+        name: text(&header["title"]),
+        art_url: portrait(&header["thumbnail"]),
+    };
+    let mut tracks = Vec::new();
+    if let Some(shelf) = find(&page, "musicShelfRenderer").first() {
+        tracks = songs(shelf, None);
+        // The shelf shows five: its playlist has the rest, most played first.
+        if let Some(list) = shelf["bottomEndpoint"]["browseEndpoint"].s("browseId") {
+            if let Ok(more) = browse(&list).map(|p| songs(&p, None)) {
+                if more.len() > tracks.len() {
+                    tracks = more.into_iter().take(20).collect();
+                }
+            }
+        }
+    }
+    let (mut albums, mut singles, mut similar) = (Vec::new(), Vec::new(), Vec::new());
+    for shelf in find(&page, "musicCarouselShelfRenderer") {
+        let head = &shelf["header"]["musicCarouselShelfBasicHeaderRenderer"];
+        let single = text(&head["title"]).contains("Single");
+        let cards = |v: &Value| -> Vec<RemoteAlbum> {
+            find(v, "musicTwoRowItemRenderer")
+                .into_iter()
+                .filter_map(|r| {
+                    let id = browse_id(r).filter(|i| i.starts_with("MPRE"))?;
+                    let art = thumb(&r["thumbnailRenderer"]);
+                    let mut a = album_from(id, text(&r["title"]), &runs(&r["subtitle"]), art);
+                    if a.artists.is_empty() {
+                        a.artists = vec![artist.name.clone()];
+                    }
+                    Some(a)
+                })
+                .collect()
+        };
+        let mut found = cards(shelf);
+        if found.is_empty() {
+            similar.extend(find(shelf, "musicTwoRowItemRenderer").into_iter().filter_map(|r| {
+                let id = browse_id(r).filter(|i| i.starts_with("UC"))?;
+                Some(RemoteArtist {
+                    service: "ytm".into(),
+                    id,
+                    name: text(&r["title"]),
+                    art_url: portrait(&r["thumbnailRenderer"]),
+                })
+            }));
+            continue;
+        }
+        // "More" opens the whole discography; the shelf only has the first ten.
+        let more =
+            &head["moreContentButton"]["buttonRenderer"]["navigationEndpoint"]["browseEndpoint"];
+        if let (Some(more_id), Some(params)) = (more.s("browseId"), more.s("params")) {
+            let params = params.replace("%3D", "=");
+            if let Ok(all) = call("browse", json!({ "browseId": more_id, "params": params })) {
+                let all = cards(&all);
+                if all.len() > found.len() {
+                    found = all;
+                }
+            }
+        }
+        if single { &mut singles } else { &mut albums }.extend(found);
+    }
+    Ok(RemoteArtistPage { artist, tracks, albums, singles, similar })
+}
+
 /// Liked songs, then the user's playlists and the ones they saved.
 pub fn playlists() -> Result<Vec<RemotePlaylist>> {
     signed_in()?;
@@ -491,11 +643,18 @@ pub fn playlist(id: &str) -> Result<Vec<RemoteTrack>> {
     if id.starts_with("MPRE") {
         let page = browse(id)?;
         let cover = find(&page, "musicThumbnailRenderer").first().and_then(|t| thumb(t));
-        let album = find(&page, "musicResponsiveHeaderRenderer").first().map(|h| text(&h["title"]));
+        let header = find(&page, "musicResponsiveHeaderRenderer");
+        let album = header.first().map(|h| text(&h["title"]));
+        // An album's rows name no artist when it's the album's own: the header does.
+        let by =
+            header.first().map(|h| credits(&runs(&h["straplineTextOne"])).0).unwrap_or_default();
         return Ok(songs(&page, cover.as_ref())
             .into_iter()
             .map(|mut t| {
                 t.album = t.album.or_else(|| album.clone());
+                if t.artists.is_empty() {
+                    t.artists = by.clone();
+                }
                 t
             })
             .collect());

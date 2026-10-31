@@ -15,7 +15,9 @@ use std::time::SystemTime;
 use anyhow::{anyhow, Result};
 use symphonia::core::io::MediaSource;
 
-pub use crate::api::streaming::{RemotePlaylist, RemoteShelf, RemoteTrack};
+pub use crate::api::streaming::{
+    RemoteAlbum, RemoteArtist, RemoteArtistPage, RemotePlaylist, RemoteShelf, RemoteTrack,
+};
 
 struct Dirs {
     cache: PathBuf,
@@ -423,6 +425,11 @@ mod tests {
             lists.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ")
         );
         println!("mixes: {:?}", tidal::mixes().map(|m| m.len()));
+        print_artist(&tidal::search_artists("radiohead").unwrap(), tidal::artist);
+        let albums = tidal::search_albums("radiohead ok computer").unwrap();
+        println!("albums: {:?}", albums.iter().take(3).collect::<Vec<_>>());
+        let id = albums[0].id.strip_prefix("album:").unwrap();
+        println!("album: {} songs", tidal::album(id).unwrap().len());
         let isrc = found.iter().find_map(|t| t.isrc.clone()).unwrap();
         let same = tidal::by_isrc(&isrc).unwrap();
         println!(
@@ -550,6 +557,35 @@ mod tests {
     }
 
     /// Plays a real YouTube Music song (signed out; needs yt-dlp):
+    fn print_artist(found: &[RemoteArtist], page: fn(&str) -> Result<RemoteArtistPage>) {
+        let names: Vec<_> = found.iter().take(3).map(|a| (&a.id, &a.name)).collect();
+        println!("artists: {names:?}");
+        let p = page(&found[0].id).unwrap();
+        println!(
+            "artist {:?}: {} songs (first {:?}), albums {:?}, singles {}, similar {:?}",
+            p.artist,
+            p.tracks.len(),
+            p.tracks.first().map(|t| &t.title),
+            p.albums.iter().map(|a| (&a.title, a.year, &a.kind, &a.artists)).collect::<Vec<_>>(),
+            p.singles.len(),
+            p.similar.iter().map(|a| &a.name).collect::<Vec<_>>()
+        );
+        assert!(!p.tracks.is_empty() && !p.albums.is_empty());
+    }
+
+    /// `cargo test live_youtube_artists -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn live_youtube_artists() {
+        print_artist(&youtube::search_artists("radiohead").unwrap(), youtube::artist);
+        let albums = youtube::search_albums("radiohead ok computer").unwrap();
+        println!("albums: {:?}", albums.iter().take(3).collect::<Vec<_>>());
+        let songs = youtube::playlist(&albums[0].id).unwrap();
+        let first = songs.first().map(|t| (&t.title, &t.artists));
+        println!("album: {} songs, first {first:?}", songs.len());
+        assert_eq!(songs[0].artists, ["Radiohead"]);
+    }
+
     /// `cargo test live_youtube -- --ignored --nocapture`.
     #[test]
     #[ignore]

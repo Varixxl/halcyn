@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 583380572;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1295669328;
 
 // Section: executor
 
@@ -1789,6 +1789,43 @@ fn wire__crate__api__streaming__streaming_art_urls_impl(
         },
     )
 }
+fn wire__crate__api__streaming__streaming_artist_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "streaming_artist",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service_name = <String>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::streaming::streaming_artist(api_service_name, api_id)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__streaming__streaming_by_isrc_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2331,6 +2368,84 @@ fn wire__crate__api__streaming__streaming_search_impl(
                     (move || {
                         let output_ok =
                             crate::api::streaming::streaming_search(api_service_name, api_query)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__streaming__streaming_search_albums_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "streaming_search_albums",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service_name = <String>::sse_decode(&mut deserializer);
+            let api_query = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::streaming::streaming_search_albums(
+                            api_service_name,
+                            api_query,
+                        )?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__streaming__streaming_search_artists_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "streaming_search_artists",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service_name = <String>::sse_decode(&mut deserializer);
+            let api_query = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::streaming::streaming_search_artists(
+                            api_service_name,
+                            api_query,
+                        )?;
                         std::result::Result::Ok(output_ok)
                     })(),
                 )
@@ -2929,6 +3044,34 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Vec<crate::api::streaming::RemoteAlbum> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::streaming::RemoteAlbum>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::streaming::RemoteArtist> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::streaming::RemoteArtist>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::streaming::RemotePlaylist> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3132,6 +3275,62 @@ impl SseDecode for crate::api::plugins::PluginRequest {
             call: var_call,
             method: var_method,
             args: var_args,
+        };
+    }
+}
+
+impl SseDecode for crate::api::streaming::RemoteAlbum {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_service = <String>::sse_decode(deserializer);
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_artists = <Vec<String>>::sse_decode(deserializer);
+        let mut var_year = <Option<u32>>::sse_decode(deserializer);
+        let mut var_kind = <Option<String>>::sse_decode(deserializer);
+        let mut var_artUrl = <Option<String>>::sse_decode(deserializer);
+        return crate::api::streaming::RemoteAlbum {
+            service: var_service,
+            id: var_id,
+            title: var_title,
+            artists: var_artists,
+            year: var_year,
+            kind: var_kind,
+            art_url: var_artUrl,
+        };
+    }
+}
+
+impl SseDecode for crate::api::streaming::RemoteArtist {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_service = <String>::sse_decode(deserializer);
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_artUrl = <Option<String>>::sse_decode(deserializer);
+        return crate::api::streaming::RemoteArtist {
+            service: var_service,
+            id: var_id,
+            name: var_name,
+            art_url: var_artUrl,
+        };
+    }
+}
+
+impl SseDecode for crate::api::streaming::RemoteArtistPage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_artist = <crate::api::streaming::RemoteArtist>::sse_decode(deserializer);
+        let mut var_tracks = <Vec<crate::api::streaming::RemoteTrack>>::sse_decode(deserializer);
+        let mut var_albums = <Vec<crate::api::streaming::RemoteAlbum>>::sse_decode(deserializer);
+        let mut var_singles = <Vec<crate::api::streaming::RemoteAlbum>>::sse_decode(deserializer);
+        let mut var_similar = <Vec<crate::api::streaming::RemoteArtist>>::sse_decode(deserializer);
+        return crate::api::streaming::RemoteArtistPage {
+            artist: var_artist,
+            tracks: var_tracks,
+            albums: var_albums,
+            singles: var_singles,
+            similar: var_similar,
         };
     }
 }
@@ -3452,76 +3651,89 @@ fn pde_ffi_dispatcher_primary_impl(
         50 => {
             wire__crate__api__streaming__streaming_art_urls_impl(port, ptr, rust_vec_len, data_len)
         }
-        51 => {
+        51 => wire__crate__api__streaming__streaming_artist_impl(port, ptr, rust_vec_len, data_len),
+        52 => {
             wire__crate__api__streaming__streaming_by_isrc_impl(port, ptr, rust_vec_len, data_len)
         }
-        52 => {
+        53 => {
             wire__crate__api__streaming__streaming_download_impl(port, ptr, rust_vec_len, data_len)
         }
-        54 => wire__crate__api__streaming__streaming_export_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__streaming__streaming_home_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__streaming__streaming_import_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__streaming__streaming_init_impl(port, ptr, rust_vec_len, data_len),
-        58 => wire__crate__api__streaming__streaming_like_impl(port, ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__streaming__streaming_playlist_tracks_impl(
+        55 => wire__crate__api__streaming__streaming_export_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__streaming__streaming_home_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__streaming__streaming_import_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__streaming__streaming_init_impl(port, ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__streaming__streaming_like_impl(port, ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__streaming__streaming_playlist_tracks_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        60 => {
+        61 => {
             wire__crate__api__streaming__streaming_playlists_impl(port, ptr, rust_vec_len, data_len)
         }
-        61 => wire__crate__api__streaming__streaming_radio_impl(port, ptr, rust_vec_len, data_len),
-        62 => wire__crate__api__streaming__streaming_record_listen_impl(
+        62 => wire__crate__api__streaming__streaming_radio_impl(port, ptr, rust_vec_len, data_len),
+        63 => wire__crate__api__streaming__streaming_record_listen_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        63 => {
+        64 => {
             wire__crate__api__streaming__streaming_remember_impl(port, ptr, rust_vec_len, data_len)
         }
-        64 => wire__crate__api__streaming__streaming_save_impl(port, ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__streaming__streaming_search_impl(port, ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__streaming__streaming_set_youtube_resolver_impl(
+        65 => wire__crate__api__streaming__streaming_save_impl(port, ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__streaming__streaming_search_impl(port, ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__streaming__streaming_search_albums_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        67 => wire__crate__api__streaming__streaming_tidal_finish_login_impl(
+        68 => wire__crate__api__streaming__streaming_search_artists_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        68 => wire__crate__api__streaming__streaming_tidal_login_url_impl(
+        69 => wire__crate__api__streaming__streaming_set_youtube_resolver_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        70 => wire__crate__api__streaming__streaming_tidal_sign_out_impl(
+        70 => wire__crate__api__streaming__streaming_tidal_finish_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        71 => wire__crate__api__streaming__streaming_tracks_impl(port, ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__streaming__streaming_youtube_sign_in_impl(
+        71 => wire__crate__api__streaming__streaming_tidal_login_url_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        73 => wire__crate__api__streaming__streaming_youtube_sign_in_from_browser_impl(
+        73 => wire__crate__api__streaming__streaming_tidal_sign_out_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        74 => wire__crate__api__streaming__streaming_youtube_sign_out_impl(
+        74 => wire__crate__api__streaming__streaming_tracks_impl(port, ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__streaming__streaming_youtube_sign_in_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        76 => wire__crate__api__streaming__streaming_youtube_sign_in_from_browser_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        77 => wire__crate__api__streaming__streaming_youtube_sign_out_impl(
             port,
             ptr,
             rust_vec_len,
@@ -3562,12 +3774,12 @@ fn pde_ffi_dispatcher_sync_impl(
         45 => wire__crate__api__plugins__plugin_stop_impl(ptr, rust_vec_len, data_len),
         47 => wire__crate__api__sound__sound_curve_freqs_impl(ptr, rust_vec_len, data_len),
         48 => wire__crate__api__sound__sound_set_impl(ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__streaming__streaming_download_progress_impl(
+        54 => wire__crate__api__streaming__streaming_download_progress_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        69 => {
+        72 => {
             wire__crate__api__streaming__streaming_tidal_redirect_impl(ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -3765,6 +3977,79 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::plugins::PluginRequest>
     for crate::api::plugins::PluginRequest
 {
     fn into_into_dart(self) -> crate::api::plugins::PluginRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::streaming::RemoteAlbum {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.service.into_into_dart().into_dart(),
+            self.id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.artists.into_into_dart().into_dart(),
+            self.year.into_into_dart().into_dart(),
+            self.kind.into_into_dart().into_dart(),
+            self.art_url.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::streaming::RemoteAlbum
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::streaming::RemoteAlbum>
+    for crate::api::streaming::RemoteAlbum
+{
+    fn into_into_dart(self) -> crate::api::streaming::RemoteAlbum {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::streaming::RemoteArtist {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.service.into_into_dart().into_dart(),
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.art_url.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::streaming::RemoteArtist
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::streaming::RemoteArtist>
+    for crate::api::streaming::RemoteArtist
+{
+    fn into_into_dart(self) -> crate::api::streaming::RemoteArtist {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::streaming::RemoteArtistPage {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.artist.into_into_dart().into_dart(),
+            self.tracks.into_into_dart().into_dart(),
+            self.albums.into_into_dart().into_dart(),
+            self.singles.into_into_dart().into_dart(),
+            self.similar.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::streaming::RemoteArtistPage
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::streaming::RemoteArtistPage>
+    for crate::api::streaming::RemoteArtistPage
+{
+    fn into_into_dart(self) -> crate::api::streaming::RemoteArtistPage {
         self
     }
 }
@@ -4239,6 +4524,26 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::streaming::RemoteAlbum> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::streaming::RemoteAlbum>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::streaming::RemoteArtist> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::streaming::RemoteArtist>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::streaming::RemotePlaylist> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -4392,6 +4697,40 @@ impl SseEncode for crate::api::plugins::PluginRequest {
         <u32>::sse_encode(self.call, serializer);
         <String>::sse_encode(self.method, serializer);
         <String>::sse_encode(self.args, serializer);
+    }
+}
+
+impl SseEncode for crate::api::streaming::RemoteAlbum {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.service, serializer);
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <Vec<String>>::sse_encode(self.artists, serializer);
+        <Option<u32>>::sse_encode(self.year, serializer);
+        <Option<String>>::sse_encode(self.kind, serializer);
+        <Option<String>>::sse_encode(self.art_url, serializer);
+    }
+}
+
+impl SseEncode for crate::api::streaming::RemoteArtist {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.service, serializer);
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.art_url, serializer);
+    }
+}
+
+impl SseEncode for crate::api::streaming::RemoteArtistPage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::streaming::RemoteArtist>::sse_encode(self.artist, serializer);
+        <Vec<crate::api::streaming::RemoteTrack>>::sse_encode(self.tracks, serializer);
+        <Vec<crate::api::streaming::RemoteAlbum>>::sse_encode(self.albums, serializer);
+        <Vec<crate::api::streaming::RemoteAlbum>>::sse_encode(self.singles, serializer);
+        <Vec<crate::api::streaming::RemoteArtist>>::sse_encode(self.similar, serializer);
     }
 }
 

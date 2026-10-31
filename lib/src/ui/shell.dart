@@ -30,6 +30,9 @@ import 'widgets.dart';
 /// left after the built-in ones.
 const _dockButtons = 5;
 
+/// The page area's navigator, for opening an artist or album from anywhere.
+final contentPages = GlobalKey<NavigatorState>();
+
 /// The sidebar (or, on a phone, the tabs), the page area with its own navigator so
 /// album and artist pages open inside it, and the docked player.
 class Shell extends StatefulWidget {
@@ -40,7 +43,7 @@ class Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<Shell> {
-  final _pages = GlobalKey<NavigatorState>();
+  final _pages = contentPages;
 
   /// Filters the page shown (top right).
   final _search = TextEditingController();

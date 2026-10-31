@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use super::http::{self, Body, Get, Status, AGENT};
-use super::{RemotePlaylist, RemoteTrack};
+use super::{RemoteAlbum, RemoteArtist, RemoteArtistPage, RemotePlaylist, RemoteTrack};
 
 const CLIENT_ID: &str = env!("TIDAL_CLIENT_ID");
 const CLIENT_SECRET: &str = env!("TIDAL_CLIENT_SECRET");
@@ -519,6 +519,83 @@ pub fn by_isrc(isrc: &str) -> Result<Vec<RemoteTrack>> {
 
 pub fn album(id: &str) -> Result<Vec<RemoteTrack>> {
     Ok(tracks(&paged(&format!("albums/{id}/tracks"), 100, false)?))
+}
+
+fn album_of(a: &Value) -> Option<RemoteAlbum> {
+    if a["allowStreaming"] == Value::Bool(false) {
+        return None;
+    }
+    let kind = match a.s("type").as_deref() {
+        Some("EP") => "EP",
+        Some("SINGLE") => "Single",
+        _ => "Album",
+    };
+    Some(RemoteAlbum {
+        service: "tidal".into(),
+        id: format!("album:{}", a.s("id")?),
+        title: title(a),
+        artists: a.list("artists").iter().filter_map(|a| a.s("name")).collect(),
+        year: a.s("releaseDate").and_then(|d| d.get(..4)?.parse().ok()),
+        kind: Some(kind.into()),
+        art_url: image(a.s("cover"), 640),
+    })
+}
+
+fn artist_of(a: &Value) -> Option<RemoteArtist> {
+    Some(RemoteArtist {
+        service: "tidal".into(),
+        id: a.s("id")?,
+        name: a.s("name")?,
+        art_url: image(a.s("picture"), 750),
+    })
+}
+
+pub fn search_albums(query: &str) -> Result<Vec<RemoteAlbum>> {
+    let found = get(
+        "search",
+        &[("query", query.into()), ("types", "ALBUMS".into()), ("limit", "30".into())],
+    )?;
+    Ok(found["albums"].list("items").iter().filter_map(album_of).collect())
+}
+
+pub fn search_artists(query: &str) -> Result<Vec<RemoteArtist>> {
+    let found = get(
+        "search",
+        &[("query", query.into()), ("types", "ARTISTS".into()), ("limit", "20".into())],
+    )?;
+    Ok(found["artists"].list("items").iter().filter_map(artist_of).collect())
+}
+
+/// The artist's top songs, albums, singles and EPs (newest first), and similar artists.
+pub fn artist(id: &str) -> Result<RemoteArtistPage> {
+    let artist = artist_of(&get(&format!("artists/{id}"), &[])?)
+        .ok_or_else(|| anyhow!("Tidal has no artist {id}"))?;
+    let top = get(&format!("artists/{id}/toptracks"), &[("limit", "20".into())])?;
+    let albums = |filter: Option<&str>| -> Result<Vec<RemoteAlbum>> {
+        let mut params = vec![("limit", "50".to_string())];
+        if let Some(f) = filter {
+            params.push(("filter", f.into()));
+        }
+        let mut seen = std::collections::HashSet::new();
+        Ok(get(&format!("artists/{id}/albums"), &params)?
+            .list("items")
+            .iter()
+            .filter_map(album_of)
+            // Tidal lists each quality of an album apart: one of each title is enough.
+            .filter(|a| seen.insert(a.title.to_lowercase()))
+            .collect())
+    };
+    let similar = get(&format!("artists/{id}/similar"), &[("limit", "12".into())])
+        .map(|v| v.list("items").iter().filter_map(artist_of).collect())
+        // Not every artist has any: Tidal answers 404.
+        .unwrap_or_default();
+    Ok(RemoteArtistPage {
+        artist,
+        tracks: tracks(&top.list("items")),
+        albums: albums(None)?,
+        singles: albums(Some("EPSANDSINGLES"))?,
+        similar,
+    })
 }
 
 /// The user's playlists and the ones they follow, after their favourite tracks.

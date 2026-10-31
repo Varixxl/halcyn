@@ -6,6 +6,7 @@ import '../rust/api/library.dart';
 import '../state/library.dart';
 import '../state/sort.dart';
 import '../theme.dart';
+import 'lookup.dart';
 import 'places.dart';
 import 'plugin_view.dart';
 import 'slate.dart';
@@ -404,17 +405,29 @@ class _TrackRowState extends State<TrackRow> {
         ),
         if (columns.wide) ...[
           const SizedBox(width: 14),
-          Expanded(flex: 15, child: artists),
+          Expanded(
+            flex: 15,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: NameLinks(
+                names: track.artists,
+                style: muted,
+                onOpen: (name) => openArtist(context, name),
+              ),
+            ),
+          ),
         ],
         if (columns.album) ...[
           const SizedBox(width: 14),
           Expanded(
             flex: 13,
-            child: Text(
-              track.album ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: muted,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: NameLinks(
+                names: [?track.album],
+                style: muted,
+                onOpen: (_) => openAlbum(context, track),
+              ),
             ),
           ),
         ],
@@ -509,6 +522,15 @@ Future<void> showTrackMenu(
       item('next', Icons.playlist_play_rounded, 'Play next'),
       item('queue', Icons.queue_music_rounded, 'Add to queue'),
       item('playlist', Icons.playlist_add_rounded, 'Add to playlist…'),
+      for (final (i, name) in track.artists.take(3).indexed)
+        if (canOpenArtist(context, name))
+          item(
+            'artist $i',
+            Icons.person_outline_rounded,
+            track.artists.length == 1 ? 'Go to artist' : 'Go to $name',
+          ),
+      if (canOpenAlbum(context, track))
+        item('album', Icons.album_outlined, 'Go to album'),
       if (onRemove != null)
         item('remove', Icons.remove_circle_outline_rounded, removeLabel),
       for (final (i, action) in actions.indexed)
@@ -525,6 +547,10 @@ Future<void> showTrackMenu(
       _toast(context, 'Added to the queue');
     case 'playlist':
       await addToPlaylist(context, [track]);
+    case final String c when c.startsWith('artist '):
+      openArtist(context, track.artists[int.parse(c.substring(7))]);
+    case 'album':
+      openAlbum(context, track);
     case 'remove':
       onRemove!();
     case final String c when c.startsWith('plugin '):

@@ -184,6 +184,21 @@ class StreamingController extends ChangeNotifier {
   Future<List<Track>> search(String service, String query) async =>
       _remember(await streamingSearch(serviceName: service, query: query));
 
+  Future<List<RemoteAlbum>> searchAlbums(String service, String query) =>
+      streamingSearchAlbums(serviceName: service, query: query);
+
+  Future<List<RemoteArtist>> searchArtists(String service, String query) =>
+      streamingSearchArtists(serviceName: service, query: query);
+
+  /// An artist's page on [service], with its top songs remembered like any others.
+  Future<(RemoteArtistPage, List<Track>)> artist(
+    String service,
+    String id,
+  ) async {
+    final page = await streamingArtist(serviceName: service, id: id);
+    return (page, await _remember(page.tracks));
+  }
+
   Future<List<RemotePlaylist>> playlistsOf(String service) =>
       streamingPlaylists(serviceName: service);
 

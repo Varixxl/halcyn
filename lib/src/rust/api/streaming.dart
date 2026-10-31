@@ -9,7 +9,7 @@ import 'library.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `service`, `which`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Reads the saved sign-ins. Call once at startup, after `library_open`.
 Future<void> streamingInit({
@@ -106,6 +106,30 @@ Future<List<RemoteTrack>> streamingByIsrc({
   isrc: isrc,
 );
 
+Future<List<RemoteAlbum>> streamingSearchAlbums({
+  required String serviceName,
+  required String query,
+}) => RustLib.instance.api.crateApiStreamingStreamingSearchAlbums(
+  serviceName: serviceName,
+  query: query,
+);
+
+Future<List<RemoteArtist>> streamingSearchArtists({
+  required String serviceName,
+  required String query,
+}) => RustLib.instance.api.crateApiStreamingStreamingSearchArtists(
+  serviceName: serviceName,
+  query: query,
+);
+
+Future<RemoteArtistPage> streamingArtist({
+  required String serviceName,
+  required String id,
+}) => RustLib.instance.api.crateApiStreamingStreamingArtist(
+  serviceName: serviceName,
+  id: id,
+);
+
 Future<List<RemotePlaylist>> streamingPlaylists({
   required String serviceName,
 }) => RustLib.instance.api.crateApiStreamingStreamingPlaylists(
@@ -174,6 +198,121 @@ Future<String> streamingSave({
 /// Every streamed song remembered.
 Future<List<Track>> streamingTracks() =>
     RustLib.instance.api.crateApiStreamingStreamingTracks();
+
+/// An album on a service. Open it as the `RemotePlaylist` with the same service and id.
+class RemoteAlbum {
+  final String service;
+
+  /// Tidal: `album:<id>`. YouTube Music: `MPREb_…`.
+  final String id;
+  final String title;
+  final List<String> artists;
+  final int? year;
+
+  /// "Album", "EP" or "Single", when the service says.
+  final String? kind;
+  final String? artUrl;
+
+  const RemoteAlbum({
+    required this.service,
+    required this.id,
+    required this.title,
+    required this.artists,
+    this.year,
+    this.kind,
+    this.artUrl,
+  });
+
+  @override
+  int get hashCode =>
+      service.hashCode ^
+      id.hashCode ^
+      title.hashCode ^
+      artists.hashCode ^
+      year.hashCode ^
+      kind.hashCode ^
+      artUrl.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemoteAlbum &&
+          runtimeType == other.runtimeType &&
+          service == other.service &&
+          id == other.id &&
+          title == other.title &&
+          artists == other.artists &&
+          year == other.year &&
+          kind == other.kind &&
+          artUrl == other.artUrl;
+}
+
+class RemoteArtist {
+  final String service;
+
+  /// Tidal: the artist's number. YouTube Music: a channel id, `UC…`.
+  final String id;
+  final String name;
+  final String? artUrl;
+
+  const RemoteArtist({
+    required this.service,
+    required this.id,
+    required this.name,
+    this.artUrl,
+  });
+
+  @override
+  int get hashCode =>
+      service.hashCode ^ id.hashCode ^ name.hashCode ^ artUrl.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemoteArtist &&
+          runtimeType == other.runtimeType &&
+          service == other.service &&
+          id == other.id &&
+          name == other.name &&
+          artUrl == other.artUrl;
+}
+
+/// What a service has of an artist: their popular songs, albums, singles and EPs, and
+/// artists like them.
+class RemoteArtistPage {
+  final RemoteArtist artist;
+  final List<RemoteTrack> tracks;
+  final List<RemoteAlbum> albums;
+  final List<RemoteAlbum> singles;
+  final List<RemoteArtist> similar;
+
+  const RemoteArtistPage({
+    required this.artist,
+    required this.tracks,
+    required this.albums,
+    required this.singles,
+    required this.similar,
+  });
+
+  @override
+  int get hashCode =>
+      artist.hashCode ^
+      tracks.hashCode ^
+      albums.hashCode ^
+      singles.hashCode ^
+      similar.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RemoteArtistPage &&
+          runtimeType == other.runtimeType &&
+          artist == other.artist &&
+          tracks == other.tracks &&
+          albums == other.albums &&
+          singles == other.singles &&
+          similar == other.similar;
+}
 
 class RemotePlaylist {
   /// "tidal" or "ytm".

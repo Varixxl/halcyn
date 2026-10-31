@@ -135,6 +135,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<RemoteAlbum> dco_decode_list_remote_album(dynamic raw);
+
+  @protected
+  List<RemoteArtist> dco_decode_list_remote_artist(dynamic raw);
+
+  @protected
   List<RemotePlaylist> dco_decode_list_remote_playlist(dynamic raw);
 
   @protected
@@ -172,6 +178,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PluginRequest dco_decode_plugin_request(dynamic raw);
+
+  @protected
+  RemoteAlbum dco_decode_remote_album(dynamic raw);
+
+  @protected
+  RemoteArtist dco_decode_remote_artist(dynamic raw);
+
+  @protected
+  RemoteArtistPage dco_decode_remote_artist_page(dynamic raw);
 
   @protected
   RemotePlaylist dco_decode_remote_playlist(dynamic raw);
@@ -322,6 +337,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<RemoteAlbum> sse_decode_list_remote_album(SseDeserializer deserializer);
+
+  @protected
+  List<RemoteArtist> sse_decode_list_remote_artist(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<RemotePlaylist> sse_decode_list_remote_playlist(
     SseDeserializer deserializer,
   );
@@ -361,6 +384,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PluginRequest sse_decode_plugin_request(SseDeserializer deserializer);
+
+  @protected
+  RemoteAlbum sse_decode_remote_album(SseDeserializer deserializer);
+
+  @protected
+  RemoteArtist sse_decode_remote_artist(SseDeserializer deserializer);
+
+  @protected
+  RemoteArtistPage sse_decode_remote_artist_page(SseDeserializer deserializer);
 
   @protected
   RemotePlaylist sse_decode_remote_playlist(SseDeserializer deserializer);
@@ -546,6 +578,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_remote_album(
+    List<RemoteAlbum> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_remote_artist(
+    List<RemoteArtist> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_remote_playlist(
     List<RemotePlaylist> self,
     SseSerializer serializer,
@@ -595,6 +639,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_plugin_request(PluginRequest self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_remote_album(RemoteAlbum self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_remote_artist(RemoteArtist self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_remote_artist_page(
+    RemoteArtistPage self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_remote_playlist(

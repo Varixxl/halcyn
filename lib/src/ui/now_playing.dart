@@ -13,6 +13,7 @@ import '../theme.dart';
 import '../window.dart';
 import 'cast.dart';
 import 'equalizer.dart';
+import 'lookup.dart';
 import 'player_bar.dart';
 import 'plugin_view.dart';
 import 'queue_page.dart';
@@ -541,7 +542,7 @@ class _Titles extends StatelessWidget {
   Widget _titles(BuildContext context, PlayerController player) {
     final theme = Theme.of(context);
     final track = player.current!;
-    final album = [?track.album, ?track.year?.toString()].join(' · ');
+    final hasAlbum = track.album != null || track.year != null;
     return AnimatedSwitcher(
       duration: Motion.medium,
       switchInCurve: Motion.curve,
@@ -563,28 +564,31 @@ class _Titles extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            track.artists.join(', '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          NameLinks(
+            names: track.artists,
             style: theme.textTheme.titleMedium?.copyWith(
               color: Palette.accentLight,
             ),
+            onOpen: (name) => openArtist(context, name),
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              if (album.isNotEmpty)
+              if (hasAlbum)
                 Flexible(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 10),
-                    child: Text(
-                      album,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: NameLinks(
+                      names: [?track.album],
+                      suffix: switch ((track.album, track.year)) {
+                        (_, null) => null,
+                        (null, final year?) => '$year',
+                        (_, final year?) => ' · $year',
+                      },
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Palette.textMuted,
                       ),
+                      onOpen: (_) => openAlbum(context, track),
                     ),
                   ),
                 ),
@@ -630,11 +634,10 @@ class _Header extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Text(
-                track.artists.join(', '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              NameLinks(
+                names: track.artists,
                 style: TextStyle(color: Palette.accentLight),
+                onOpen: (name) => openArtist(context, name),
               ),
             ],
           ),
